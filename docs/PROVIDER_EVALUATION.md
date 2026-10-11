@@ -253,3 +253,31 @@ The current frontend remains a demonstration using fictional records. The backen
 6. Google Maps Platform, India pricing: https://mapsplatform.google.com/intl/en_in/pricing/
 
 **Note:** This document records initial research, not legal advice or proof of complete coverage. Recheck provider documentation and terms before implementation and public launch.
+
+
+
+Dataset inspected: hospital_directory.csv
+
+
+
+Total records: 30,273
+
+
+
+West Bengal records: 1,164
+
+
+
+Kolkata district records: 416
+
+
+
+Kolkata records with usable coordinates: 0
+
+
+
+Kolkata records with specialty information: 20
+
+
+
+Decision: not sufficient as a standalone source for radius-based clinic discovery
