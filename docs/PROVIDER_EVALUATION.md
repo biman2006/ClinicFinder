@@ -281,3 +281,30 @@ Kolkata records with specialty information: 20
 
 
 Decision: not sufficient as a standalone source for radius-based clinic discovery
+
+
+
+
+### Initial Export Audit — 11 October 2026
+
+**Source:** OpenStreetMap via Overpass Turbo  
+**File inspected:** `export.json`  
+**Query scope:** Kolkata geocoded area, selecting `amenity=clinic` or `healthcare=clinic`
+
+| Metric | Observed count |
+|---|---:|
+| Total features | 112 |
+| Nodes | 110 |
+| Ways | 2 |
+| Features with names | 111 |
+| Features with address tags | 107 |
+| Features with phone details | 50 |
+| Features with website tags | 17 |
+| Features with specialty tags | 7 |
+| Features with coordinates | 112 |
+
+**Limitations:** This is an initial export, not proof of complete Kolkata coverage. Field presence does not establish accuracy, current operation, or verification. The query may include related facility features, and some records may represent centres rather than conventional clinics.
+
+**Decision:** OpenStreetMap remains a candidate for the MVP, pending a larger and repeatable coverage audit, duplicate checks, geographic-boundary validation, attribution review, and an appropriate data-refresh plan. No production provider decision has been made.
+
+**Important:** The uploaded file contains 112 features. Do not report it as a 6,000-record export.
