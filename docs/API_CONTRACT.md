@@ -2,6 +2,87 @@
 
 Base path: `/api/v1`. Exact schemas are proposals until confirmed.
 
+## GET `/clinics/search`
+
+The current provider integration exposes a coordinate-based evaluation endpoint.
+It does not geocode text locations and does not accept symptom text.
+
+Query parameters:
+
+- `latitude`: number from -90 to 90
+- `longitude`: number from -180 to 180
+- `radius_km`: number greater than 0 and no greater than 50
+
+The response is:
+
+```json
+{
+  "items": [
+    {
+      "clinic_id": null,
+      "name": "source-provided clinic name",
+      "address": null,
+      "latitude": null,
+      "longitude": null,
+      "phone": null,
+      "website": null,
+      "distance_km": null,
+      "rating": null,
+      "opening_status": "unknown",
+      "services": [],
+      "doctors": [],
+      "match_reasons": [],
+      "data_sources": ["OpenStreetMap"],
+      "last_verified_at": null,
+      "source_type": "node",
+      "source_id": 123,
+      "verification_status": "unverified"
+    }
+  ]
+}
+```
+
+Invalid query parameters return HTTP 422. Provider availability failures return
+HTTP 503 and invalid provider responses return HTTP 502 with a safe `error`
+object. Listings remain unverified and missing source fields remain unknown.
+
+## GET `/locations/search`
+
+The location-resolution endpoint accepts one user-submitted area or address
+query. It is called only when the user submits the search form; it is not an
+autocomplete endpoint.
+
+Query parameter:
+
+- `query`: trimmed text between 2 and 200 characters
+
+Successful response:
+
+```json
+{
+  "items": [
+    {
+      "display_name": "New Town, Kolkata, West Bengal, India",
+      "latitude": 22.58,
+      "longitude": 88.48,
+      "precision": "approximate",
+      "osm_type": "relation",
+      "osm_id": 123
+    }
+  ]
+}
+```
+
+The frontend must show all returned matches and require the user to select a
+match when more than one is returned. It must not silently choose an
+unrelated location. The selected coordinates represent an approximate area
+location, not the user's exact position, and are then passed to
+`GET /clinics/search`.
+
+No matches return an empty `items` collection. Invalid input returns HTTP 422,
+provider availability failures return HTTP 503, and invalid provider
+responses return HTTP 502.
+
 ## POST `/search/clinics`
 Request example:
 ```json

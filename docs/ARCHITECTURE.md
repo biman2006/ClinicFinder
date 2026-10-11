@@ -37,7 +37,7 @@ PostgreSQL (proposed; PostGIS optional)
 - `repositories/`: database access.
 - `models/`: SQLAlchemy entities.
 - `schemas/`: API contracts.
-- `integrations/`: provider adapters only; do not spread provider-specific payloads through the codebase.
+- `integrations/`: provider adapters only; do not spread provider-specific payloads through the codebase. The current evaluation foundation contains an OpenStreetMap/Overpass adapter with normalized, unverified listings; it is not yet a selected production provider.
 - `core/`: settings, logging, error handling and security.
 - `tests/`: unit and API integration tests.
 
@@ -53,6 +53,21 @@ PostgreSQL (proposed; PostGIS optional)
 
 ## 5. Provider selection gate
 The source is undecided. Evaluate candidates against: Kolkata coverage, permitted use of clinic/place details, review/rating terms, storage/caching rules, attribution, price/quotas, reliability, geocoding, opening-hours freshness, and whether the source has any clinic-specific service data. A general place provider is not assumed to supply doctor affiliations, home collection, medicine stock, or bookable slots.
+
+The provider foundation accepts validated coordinate/radius searches and keeps
+provider-specific request and response handling behind the adapter boundary.
+OpenStreetMap element type and ID are retained for stable source identity;
+missing fields remain unknown and all returned listings are marked unverified.
+The adapter uses one bounded request without automatic retries and converts
+timeouts, transport failures, HTTP failures and malformed responses into safe
+structured provider errors.
+
+Text location resolution is isolated in a separate Nominatim geocoding adapter
+and `/locations/search` route. It performs one request per submitted search,
+uses a descriptive User-Agent, enforces a one-request-per-second application
+interval, and does not implement autocomplete or automatic retries. Multiple
+matches are returned to the client for explicit user selection. Coordinates
+are labelled approximate and are not treated as the user's exact location.
 
 ## 6. Proposed initial API
 All routes provisional; use `/api/v1` once versioning is introduced.

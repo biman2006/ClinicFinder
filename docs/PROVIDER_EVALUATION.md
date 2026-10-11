@@ -71,6 +71,23 @@ Missing information must be represented as unknown, not inferred or fabricated.
 
 **Status:** Candidate for evaluation; not approved.
 
+### Nominatim implementation decision for location resolution
+
+Nominatim is being evaluated only for user-submitted, one-shot area/address
+resolution. It is not used for clinic POI search, bulk geocoding, or
+autocomplete. The backend proxy sends a descriptive User-Agent, limits the
+application to at most one request per second, performs no automatic retries,
+and allows the endpoint to be changed through configuration. Multiple results
+are returned for explicit user selection; coordinates are labelled
+approximate.
+
+The public service's current policy requires no heavy use (maximum one request
+per second), a valid identifying User-Agent or Referer, attribution, and
+ODbL-aware handling. Public Nominatim availability is not guaranteed. The
+application must remain able to switch providers, and the current ₹0
+prototype must not grow into a high-volume geocoding service. See the official
+policy: https://operations.osmfoundation.org/policies/nominatim/
+
 ## 4. Candidate B — Open Government Data Platform India
 
 **Official catalog:** https://www.data.gov.in/catalog/hospital-directory-national-health-portal
@@ -308,3 +325,27 @@ Decision: not sufficient as a standalone source for radius-based clinic discover
 **Decision:** OpenStreetMap remains a candidate for the MVP, pending a larger and repeatable coverage audit, duplicate checks, geographic-boundary validation, attribution review, and an appropriate data-refresh plan. No production provider decision has been made.
 
 **Important:** The uploaded file contains 112 features. Do not report it as a 6,000-record export.
+
+## 9. Step 2 implementation foundation
+
+The repository now contains a provider-neutral adapter boundary and an
+OpenStreetMap/Overpass evaluation adapter. It accepts validated latitude,
+longitude and radius values, performs one bounded request to a configurable
+Overpass endpoint, and normalizes named OSM nodes and ways into the internal
+listing shape. Way center coordinates are used when supplied. Source type and
+ID are retained for stable deduplication, while contact alternatives such as
+`phone`/`contact:phone` and `website`/`contact:website` are normalized.
+
+This is an evaluation foundation, not a provider-selection decision or a
+public search API. Results are unverified listings; an OSM element does not
+prove that a clinic is operating, accurate, complete, or accepting patients.
+The adapter does not retry public Overpass requests and reports provider
+timeouts, transport failures, non-success responses and malformed payloads as
+safe structured errors. It does not use Nominatim.
+
+Configuration is available through `CLINIC_PROVIDER_OVERPASS_ENDPOINT` and
+`CLINIC_PROVIDER_TIMEOUT_SECONDS`. Tests mock all provider responses and can be
+run with `python -m pytest`. Before public use, confirm current Overpass
+usage limits and availability, OpenStreetMap attribution, ODbL obligations,
+refresh/storage responsibilities, Kolkata coverage, and a correction and
+verification workflow. These remain human approval decisions.

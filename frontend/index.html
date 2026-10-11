@@ -14,6 +14,7 @@
     >
 
     <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
     <script src="script.js" defer></script>
 </head>
 
@@ -84,15 +85,21 @@
                         placeholder="e.g. New Town, Kolkata"
                         autocomplete="street-address"
                         maxlength="200"
-                        required
                     >
 
                     <p class="field-hint">
-                        Enter an area, locality or address.
+                        This field is informational only. Text locations are not
+                        geocoded in the browser. The backend uses
+                        OpenStreetMap Nominatim once after submission.
                     </p>
 
                 </div>
 
+                <div
+                    id="location-choices"
+                    class="location-choices"
+                    aria-live="polite"
+                ></div>
 
                 <!-- Search query -->
                 <div class="form-group">
@@ -107,12 +114,11 @@
                         rows="4"
                         maxlength="1000"
                         placeholder="e.g. dermatology or a healthcare service you need"
-                        required
                     ></textarea>
 
                     <p class="field-hint">
-                        This information helps identify relevant healthcare
-                        services; it does not establish a diagnosis.
+                        This search is informational and does not establish a
+                        diagnosis.
                     </p>
 
                 </div>
@@ -133,6 +139,11 @@
                             <option value="10">Within 10 km</option>
                             <option value="20">Within 20 km</option>
                         </select>
+
+                        <p class="field-hint">
+                            The live endpoint currently does not filter by this
+                            field.
+                        </p>
 
                     </div>
 

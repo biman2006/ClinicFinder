@@ -1,128 +1,25 @@
-
-
 "use strict";
 
-// ========================================
-// 1. CONFIGURATION
-// ========================================
-
-const API_BASE_URL = "http://127.0.0.1:8000";
+const configuredApiBaseUrl =
+    window.CLINICFINDER_CONFIG &&
+    typeof window.CLINICFINDER_CONFIG.apiBaseUrl === "string"
+        ? window.CLINICFINDER_CONFIG.apiBaseUrl
+        : "http://127.0.0.1:8000";
+const API_BASE_URL = configuredApiBaseUrl.replace(/\/+$/, "");
 const HEALTH_ENDPOINT = `${API_BASE_URL}/health`;
-
-// These records are fictional and exist only for UI testing.
-// They are NOT real or verified clinics.
-const DEMO_CLINICS = [
-    {
-        id: "demo-001",
-        name: "Demo Clinic A",
-        specialty: "General Medicine",
-        area: "New Town, Kolkata",
-        distanceKm: 1.2,
-        homeCollection: true
-    },
-    {
-        id: "demo-002",
-        name: "Demo Clinic B",
-        specialty: "Dermatology",
-        area: "Salt Lake, Kolkata",
-        distanceKm: 3.4,
-        homeCollection: false
-    },
-    {
-        id: "demo-003",
-        name: "Demo Clinic C",
-        specialty: "General Medicine",
-        area: "Rajarhat, Kolkata",
-        distanceKm: 6.8,
-        homeCollection: true
-    }
-];
-
-// Demo-only keyword mapping.
-// This is not a medical diagnosis or clinical recommendation.
-const DEMO_KEYWORDS = {
-    "general medicine": [
-        "general medicine",
-        "general physician",
-        "physician",
-        "doctor",
-        "general doctor",
-        "fever",
-        "cold"
-    ],
-    "dermatology": [
-        "dermatology",
-        "dermatologist",
-        "skin",
-        "skin doctor"
-    ]
-};
-
-
-// ========================================
-// 2. DOM ELEMENTS
-// ========================================
+const LOCATION_ENDPOINT = `${API_BASE_URL}/locations/search`;
+const CLINIC_ENDPOINT = `${API_BASE_URL}/clinics/search`;
 
 const searchForm = document.getElementById("clinic-search-form");
 const locationInput = document.getElementById("location");
 const queryInput = document.getElementById("search-query");
 const radiusSelect = document.getElementById("radius");
-const homeCollectionSelect =
-    document.getElementById("home-collection");
 const searchButton = document.getElementById("search-button");
 const searchStatus = document.getElementById("search-status");
 const resultsContainer = document.getElementById("clinic-results");
-
-
-// ========================================
-// 3. APPLICATION STATE
-// ========================================
+const locationChoices = document.getElementById("location-choices");
 
 let isSearching = false;
-let backendAvailable = false;
-
-
-// ========================================
-// 4. BACKEND HEALTH CHECK
-// ========================================
-
-async function checkBackendHealth() {
-    try {
-        const response = await fetch(HEALTH_ENDPOINT, {
-            method: "GET",
-            headers: {
-                Accept: "application/json"
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.status !== "ok") {
-            throw new Error("Unexpected health response");
-        }
-
-        backendAvailable = true;
-
-        console.info("Backend connected:", data);
-
-        return true;
-    } catch (error) {
-        backendAvailable = false;
-
-        console.warn("Backend health check failed:", error.message);
-
-        return false;
-    }
-}
-
-
-// ========================================
-// 5. UI HELPERS
-// ========================================
 
 function setSearchStatus(message, type = "info") {
     searchStatus.textContent = message;
@@ -132,294 +29,235 @@ function setSearchStatus(message, type = "info") {
 function setLoading(loading) {
     isSearching = loading;
     searchButton.disabled = loading;
-
-    searchButton.textContent = loading
-        ? "Searching..."
-        : "Search clinics";
-
-    resultsContainer.setAttribute(
-        "aria-busy",
-        String(loading)
-    );
-}
-
-function clearResults() {
-    resultsContainer.replaceChildren();
+    searchButton.textContent = loading ? "Searching..." : "Search clinics";
+    resultsContainer.setAttribute("aria-busy", String(loading));
 }
 
 function showMessage(message, className = "empty-state") {
-    clearResults();
-
+    resultsContainer.replaceChildren();
     const paragraph = document.createElement("p");
     paragraph.className = className;
     paragraph.textContent = message;
-
     resultsContainer.appendChild(paragraph);
 }
 
+function clearLocationChoices() {
+    locationChoices.replaceChildren();
+}
 
-// ========================================
-// 6. CREATE DEMO CLINIC CARDS
-// ========================================
+function validateLocationQuery() {
+    const query = locationInput.value.trim();
+    if (query.length < 2 || query.length > 200) {
+        throw new Error("Enter an area or address between 2 and 200 characters.");
+    }
+    return query;
+}
+
+function getRadius() {
+    const radiusKm = Number(radiusSelect.value);
+    if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 50) {
+        throw new Error("Select a search distance between 0 and 50 km.");
+    }
+    return radiusKm;
+}
+
+function apiErrorMessage(response, subject) {
+    if (response.status === 503) {
+        return `The ${subject} provider is temporarily unavailable. Please try again later.`;
+    }
+    if (response.status === 502) {
+        return `The ${subject} provider returned an invalid response. Please try again later.`;
+    }
+    if (response.status === 422) {
+        return `The ${subject} input is invalid.`;
+    }
+    return `The ${subject} request could not be completed. Please try again.`;
+}
+
+async function requestJson(endpoint, params, subject) {
+    const response = await fetch(`${endpoint}?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+        throw new Error(apiErrorMessage(response, subject));
+    }
+    const data = await response.json();
+    if (!data || !Array.isArray(data.items)) {
+        throw new Error(`The ${subject} response was not in the expected format.`);
+    }
+    return data.items;
+}
+
+function renderLocationChoices(locations) {
+    clearLocationChoices();
+    const heading = document.createElement("p");
+    heading.className = "field-hint";
+    heading.textContent = "Several locations matched. Select the intended area:";
+    locationChoices.appendChild(heading);
+
+    locations.forEach((location, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "location-choice";
+        button.textContent = location.display_name;
+        button.addEventListener("click", () => {
+            clearLocationChoices();
+            setLoading(true);
+            setSearchStatus("Searching the selected approximate area...", "info");
+            showMessage("Loading clinic listings...");
+            searchClinics(location).catch(handleSearchError).finally(() => {
+                setLoading(false);
+            });
+        });
+        button.setAttribute("aria-label", `Select location ${index + 1}`);
+        locationChoices.appendChild(button);
+    });
+}
+
+function formatOptional(label, value) {
+    if (typeof value !== "string" || value.trim() === "") {
+        return null;
+    }
+    const paragraph = document.createElement("p");
+    paragraph.textContent = `${label}: ${value}`;
+    return paragraph;
+}
 
 function createClinicCard(clinic) {
     const card = document.createElement("article");
     card.className = "clinic-card";
 
     const badge = document.createElement("p");
-    badge.className = "demo-badge";
-    badge.textContent = "DEMO DATA — NOT VERIFIED";
+    badge.className = "unverified-badge";
+    badge.textContent = "OPENSTREETMAP LISTING — NOT VERIFIED";
 
     const name = document.createElement("h3");
     name.textContent = clinic.name;
+    card.append(badge, name);
 
-    const specialty = document.createElement("p");
-    specialty.textContent = `Specialty: ${clinic.specialty}`;
+    [
+        formatOptional("Address", clinic.address),
+        formatOptional("Phone", clinic.phone),
+        formatOptional("Website", clinic.website),
+        clinic.services && clinic.services.length
+            ? formatOptional("Services", clinic.services.join(", "))
+            : null,
+        clinic.distance_km !== null && clinic.distance_km !== undefined
+            ? formatOptional("Distance", `${clinic.distance_km} km`)
+            : null
+    ].forEach((element) => {
+        if (element) {
+            card.appendChild(element);
+        }
+    });
 
-    const area = document.createElement("p");
-    area.textContent = `Demo area: ${clinic.area}`;
+    if (Number.isFinite(clinic.latitude) && Number.isFinite(clinic.longitude)) {
+        const mapLink = document.createElement("a");
+        mapLink.href =
+            `https://www.openstreetmap.org/?mlat=${encodeURIComponent(
+                clinic.latitude
+            )}&mlon=${encodeURIComponent(clinic.longitude)}#map=18/` +
+            `${encodeURIComponent(clinic.latitude)}/${encodeURIComponent(
+                clinic.longitude
+            )}`;
+        mapLink.target = "_blank";
+        mapLink.rel = "noopener noreferrer";
+        mapLink.textContent = "View location on OpenStreetMap";
+        card.appendChild(mapLink);
+    }
 
-    const distance = document.createElement("p");
-    distance.textContent =
-        `Fictional demo distance: ${clinic.distanceKm} km`;
-
-    const collection = document.createElement("p");
-
-    collection.textContent = clinic.homeCollection
-        ? "Home collection: Demo value only"
-        : "Home collection: Not available in this demo record";
-
-    const disclaimer = document.createElement("p");
-    disclaimer.className = "clinic-disclaimer";
-    disclaimer.textContent =
-        "Fictional record. Not a real clinic or verified service.";
-
-    card.append(
-        badge,
-        name,
-        specialty,
-        area,
-        distance,
-        collection,
-        disclaimer
-    );
-
+    const source = document.createElement("p");
+    source.className = "clinic-disclaimer";
+    source.textContent =
+        `Source: ${(clinic.data_sources || []).join(", ") || "Unknown"}; ` +
+        `OSM ${clinic.source_type} ${clinic.source_id}.`;
+    card.appendChild(source);
     return card;
 }
 
 function renderClinics(clinics) {
-    clearResults();
-
+    resultsContainer.replaceChildren();
     if (clinics.length === 0) {
-        showMessage(
-            "No demo records match your filters. Try General Medicine or Dermatology."
-        );
+        showMessage("No clinic listings were returned for this approximate area.");
         return;
     }
-
     const fragment = document.createDocumentFragment();
-
     clinics.forEach((clinic) => {
         fragment.appendChild(createClinicCard(clinic));
     });
-
     resultsContainer.appendChild(fragment);
 }
 
-
-// ========================================
-// 7. VALIDATE SEARCH INPUT
-// ========================================
-
-function getSearchCriteria() {
-    const location = locationInput.value.trim();
-    const query = queryInput.value.trim();
-    const radiusKm = Number(radiusSelect.value);
-    const homeCollection = homeCollectionSelect.value;
-
-    if (!location || !query) {
-        throw new Error(
-            "Please enter your location and healthcare need."
-        );
-    }
-
-    if (location.length > 200 || query.length > 1000) {
-        throw new Error("Your input exceeds the permitted length.");
-    }
-
-    if (![2, 5, 10, 20].includes(radiusKm)) {
-        throw new Error("Please select a valid search distance.");
-    }
-
-    if (!["any", "available", "unavailable"].includes(homeCollection)) {
-        throw new Error("Please select a valid home collection option.");
-    }
-
-    return {
-        location,
-        query,
-        radiusKm,
-        homeCollection
-    };
-}
-
-
-// ========================================
-// 8. NORMALIZE AND MATCH DEMO QUERIES
-// ========================================
-
-function normalizeText(value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s]/gu, " ")
-        .replace(/\s+/g, " ");
-}
-
-function matchesDemoSpecialty(clinic, query) {
-    const normalizedQuery = normalizeText(query);
-    const normalizedSpecialty = normalizeText(clinic.specialty);
-
-    // Direct specialty matching.
-    if (
-        normalizedSpecialty.includes(normalizedQuery) ||
-        normalizedQuery.includes(normalizedSpecialty)
-    ) {
-        return true;
-    }
-
-    // Match explicitly configured demo keywords.
-    const keywords = DEMO_KEYWORDS[normalizedSpecialty] || [];
-
-    return keywords.some((keyword) => {
-        const normalizedKeyword = normalizeText(keyword);
-
-        return (
-            normalizedQuery === normalizedKeyword ||
-            normalizedQuery.includes(normalizedKeyword)
-        );
+async function searchClinics(location) {
+    const radiusKm = getRadius();
+    const params = new URLSearchParams({
+        latitude: String(location.latitude),
+        longitude: String(location.longitude),
+        radius_km: String(radiusKm)
     });
+    const clinics = await requestJson(CLINIC_ENDPOINT, params, "clinic search");
+    renderClinics(clinics);
+    setSearchStatus(
+        clinics.length
+            ? `${clinics.length} unverified clinic listing(s) found near the selected approximate area.`
+            : "No clinic listings were found for the selected approximate area.",
+        clinics.length ? "success" : "info"
+    );
 }
 
-
-// ========================================
-// 9. FILTER DEMO RECORDS
-// ========================================
-
-function searchDemoClinics(criteria) {
-    return DEMO_CLINICS.filter((clinic) => {
-        const specialtyMatches = matchesDemoSpecialty(
-            clinic,
-            criteria.query
-        );
-
-        const withinDemoRadius =
-            clinic.distanceKm <= criteria.radiusKm;
-
-        const collectionMatches =
-            criteria.homeCollection === "any" ||
-            (
-                criteria.homeCollection === "available" &&
-                clinic.homeCollection === true
-            ) ||
-            (
-                criteria.homeCollection === "unavailable" &&
-                clinic.homeCollection === false
-            );
-
-        return (
-            specialtyMatches &&
-            withinDemoRadius &&
-            collectionMatches
-        );
-    });
+function handleSearchError(error) {
+    console.error("Clinic search failed:", error);
+    setSearchStatus(error.message, "error");
+    showMessage(error.message);
 }
-
-
-// ========================================
-// 10. HANDLE FORM SUBMISSION
-// ========================================
 
 async function handleSearch(event) {
     event.preventDefault();
-
     if (isSearching) {
         return;
     }
 
-    let criteria;
-
+    clearLocationChoices();
+    let query;
     try {
-        criteria = getSearchCriteria();
+        query = validateLocationQuery();
+        getRadius();
     } catch (error) {
         setSearchStatus(error.message, "error");
-
-        showMessage(
-            "Please correct the form and try again."
-        );
-
+        showMessage("Please correct the form and try again.");
         return;
     }
 
     setLoading(true);
-
-    setSearchStatus(
-        "Checking backend connection...",
-        "info"
-    );
-
-    showMessage("Preparing demo search...");
+    setSearchStatus("Finding the selected area...", "info");
+    showMessage("Finding the approximate location...");
 
     try {
-        const healthy = await checkBackendHealth();
-
-        if (!healthy) {
-            setSearchStatus(
-                "Backend unavailable. Start FastAPI and try again.",
-                "error"
-            );
-
-            showMessage(
-                "The backend health check failed. No search was performed."
-            );
-
+        const params = new URLSearchParams({ query });
+        const locations = await requestJson(
+            LOCATION_ENDPOINT,
+            params,
+            "location search"
+        );
+        if (locations.length === 0) {
+            setSearchStatus("No matching locations were found.", "error");
+            showMessage("No matching locations were found. Try a more specific area name.");
             return;
         }
-
-        // This is a local demo search, NOT a real API search.
-        const clinics = searchDemoClinics(criteria);
-
-        renderClinics(clinics);
-
-        if (clinics.length > 0) {
-            setSearchStatus(
-                `Backend connected. Showing ${clinics.length} fictional demo record(s). Real clinic search is not implemented.`,
-                "success"
-            );
-        } else {
-            setSearchStatus(
-                "No demo records match these filters. Real clinic search is not implemented.",
-                "info"
-            );
+        if (locations.length > 1) {
+            renderLocationChoices(locations);
+            setSearchStatus("Select the intended location before searching clinics.", "info");
+            showMessage("Choose a location from the matches above.");
+            return;
         }
+        await searchClinics(locations[0]);
     } catch (error) {
-        console.error("Unexpected search error:", error);
-
-        setSearchStatus(
-            "An unexpected error occurred. Please try again.",
-            "error"
-        );
-
-        showMessage("Unable to complete the demo search.");
+        handleSearchError(error);
     } finally {
         setLoading(false);
     }
 }
-
-
-// ========================================
-// 11. INITIALIZE APPLICATION
-// ========================================
 
 async function initializeApp() {
     const requiredElements = [
@@ -427,42 +265,34 @@ async function initializeApp() {
         locationInput,
         queryInput,
         radiusSelect,
-        homeCollectionSelect,
         searchButton,
         searchStatus,
-        resultsContainer
+        resultsContainer,
+        locationChoices
     ];
-
     if (requiredElements.some((element) => !element)) {
-        console.error(
-            "A required HTML element is missing. Check the element IDs."
-        );
+        console.error("A required HTML element is missing.");
         return;
     }
 
     searchForm.addEventListener("submit", handleSearch);
-
-    setSearchStatus(
-        "Checking backend connection...",
-        "info"
-    );
-
-    const healthy = await checkBackendHealth();
-
-    if (healthy) {
+    try {
+        const response = await fetch(HEALTH_ENDPOINT, {
+            headers: { Accept: "application/json" }
+        });
         setSearchStatus(
-            "Backend connected. Demo mode is active.",
-            "success"
+            response.ok
+                ? "Backend connected. Enter an area to search live listings."
+                : "Backend health check failed. Search may be unavailable.",
+            response.ok ? "success" : "error"
         );
-    } else {
+    } catch (error) {
+        console.warn("Backend health check failed:", error.message);
         setSearchStatus(
-            "Backend is not reachable. Start FastAPI to enable demo search.",
+            "Backend is not reachable. Start FastAPI before searching.",
             "error"
         );
     }
 }
 
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeApp
-);
+document.addEventListener("DOMContentLoaded", initializeApp);

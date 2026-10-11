@@ -283,6 +283,62 @@ button:disabled {
     font-size: 13px;
 }
 
+.clinic-card {
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.clinic-card h3 {
+    margin-bottom: 8px;
+    font-size: 19px;
+}
+
+.clinic-card p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.clinic-card a {
+    display: inline-block;
+    margin-top: 10px;
+    color: var(--primary-dark);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.location-choices {
+    margin: -8px 0 22px;
+}
+
+.location-choice {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    background: var(--surface);
+    color: var(--primary-dark);
+    border: 1px solid var(--border);
+    text-align: left;
+}
+
+.location-choice:hover {
+    background: var(--notice-background);
+}
+
+.unverified-badge {
+    margin-bottom: 8px;
+    color: var(--primary-dark) !important;
+    font-size: 11px !important;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.clinic-disclaimer {
+    margin-top: 12px;
+    font-size: 12px !important;
+}
+
 .results-section {
     margin-bottom: 30px;
 }
