@@ -1,4 +1,5 @@
 
+
 "use strict";
 
 // ========================================
@@ -8,8 +9,8 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 const HEALTH_ENDPOINT = `${API_BASE_URL}/health`;
 
-// Demo data is for frontend testing only.
-// These are fictional records, NOT real clinics.
+// These records are fictional and exist only for UI testing.
+// They are NOT real or verified clinics.
 const DEMO_CLINICS = [
     {
         id: "demo-001",
@@ -17,9 +18,7 @@ const DEMO_CLINICS = [
         specialty: "General Medicine",
         area: "New Town, Kolkata",
         distanceKm: 1.2,
-        homeCollection: true,
-        phone: null,
-        isDemo: true
+        homeCollection: true
     },
     {
         id: "demo-002",
@@ -27,9 +26,7 @@ const DEMO_CLINICS = [
         specialty: "Dermatology",
         area: "Salt Lake, Kolkata",
         distanceKm: 3.4,
-        homeCollection: false,
-        phone: null,
-        isDemo: true
+        homeCollection: false
     },
     {
         id: "demo-003",
@@ -37,11 +34,29 @@ const DEMO_CLINICS = [
         specialty: "General Medicine",
         area: "Rajarhat, Kolkata",
         distanceKm: 6.8,
-        homeCollection: true,
-        phone: null,
-        isDemo: true
+        homeCollection: true
     }
 ];
+
+// Demo-only keyword mapping.
+// This is not a medical diagnosis or clinical recommendation.
+const DEMO_KEYWORDS = {
+    "general medicine": [
+        "general medicine",
+        "general physician",
+        "physician",
+        "doctor",
+        "general doctor",
+        "fever",
+        "cold"
+    ],
+    "dermatology": [
+        "dermatology",
+        "dermatologist",
+        "skin",
+        "skin doctor"
+    ]
+};
 
 
 // ========================================
@@ -52,7 +67,8 @@ const searchForm = document.getElementById("clinic-search-form");
 const locationInput = document.getElementById("location");
 const queryInput = document.getElementById("search-query");
 const radiusSelect = document.getElementById("radius");
-const homeCollectionSelect = document.getElementById("home-collection");
+const homeCollectionSelect =
+    document.getElementById("home-collection");
 const searchButton = document.getElementById("search-button");
 const searchStatus = document.getElementById("search-status");
 const resultsContainer = document.getElementById("clinic-results");
@@ -85,15 +101,13 @@ async function checkBackendHealth() {
 
         const data = await response.json();
 
-        // The existing backend returns:
-        // {"status": "ok", "service": "clinic-discovery-api"}
         if (data.status !== "ok") {
             throw new Error("Unexpected health response");
         }
 
         backendAvailable = true;
 
-        console.info("Backend connection successful:", data);
+        console.info("Backend connected:", data);
 
         return true;
     } catch (error) {
@@ -115,17 +129,17 @@ function setSearchStatus(message, type = "info") {
     searchStatus.dataset.type = type;
 }
 
-function setLoading(isLoading) {
-    isSearching = isLoading;
-    searchButton.disabled = isLoading;
+function setLoading(loading) {
+    isSearching = loading;
+    searchButton.disabled = loading;
 
-    searchButton.textContent = isLoading
+    searchButton.textContent = loading
         ? "Searching..."
         : "Search clinics";
 
     resultsContainer.setAttribute(
         "aria-busy",
-        String(isLoading)
+        String(loading)
     );
 }
 
@@ -145,7 +159,7 @@ function showMessage(message, className = "empty-state") {
 
 
 // ========================================
-// 6. SAFE CLINIC CARD RENDERING
+// 6. CREATE DEMO CLINIC CARDS
 // ========================================
 
 function createClinicCard(clinic) {
@@ -163,20 +177,22 @@ function createClinicCard(clinic) {
     specialty.textContent = `Specialty: ${clinic.specialty}`;
 
     const area = document.createElement("p");
-    area.textContent = `Area: ${clinic.area}`;
+    area.textContent = `Demo area: ${clinic.area}`;
 
     const distance = document.createElement("p");
-    distance.textContent = `Demo distance: ${clinic.distanceKm} km`;
+    distance.textContent =
+        `Fictional demo distance: ${clinic.distanceKm} km`;
 
     const collection = document.createElement("p");
+
     collection.textContent = clinic.homeCollection
-        ? "Home sample collection: Demo availability only"
-        : "Home sample collection: Not available in this demo record";
+        ? "Home collection: Demo value only"
+        : "Home collection: Not available in this demo record";
 
     const disclaimer = document.createElement("p");
     disclaimer.className = "clinic-disclaimer";
     disclaimer.textContent =
-        "Fictional example. This is not a real clinic or verified service.";
+        "Fictional record. Not a real clinic or verified service.";
 
     card.append(
         badge,
@@ -195,7 +211,9 @@ function renderClinics(clinics) {
     clearResults();
 
     if (clinics.length === 0) {
-        showMessage("No demo records match your selected filters.");
+        showMessage(
+            "No demo records match your filters. Try General Medicine or Dermatology."
+        );
         return;
     }
 
@@ -210,7 +228,7 @@ function renderClinics(clinics) {
 
 
 // ========================================
-// 7. FORM VALIDATION AND INPUT
+// 7. VALIDATE SEARCH INPUT
 // ========================================
 
 function getSearchCriteria() {
@@ -220,18 +238,21 @@ function getSearchCriteria() {
     const homeCollection = homeCollectionSelect.value;
 
     if (!location || !query) {
-        throw new Error("Please enter your location and healthcare need.");
+        throw new Error(
+            "Please enter your location and healthcare need."
+        );
     }
 
-    if (
-        !Number.isFinite(radiusKm) ||
-        ![2, 5, 10, 20].includes(radiusKm)
-    ) {
+    if (location.length > 200 || query.length > 1000) {
+        throw new Error("Your input exceeds the permitted length.");
+    }
+
+    if (![2, 5, 10, 20].includes(radiusKm)) {
         throw new Error("Please select a valid search distance.");
     }
 
     if (!["any", "available", "unavailable"].includes(homeCollection)) {
-        throw new Error("Please select a valid home collection filter.");
+        throw new Error("Please select a valid home collection option.");
     }
 
     return {
@@ -244,50 +265,79 @@ function getSearchCriteria() {
 
 
 // ========================================
-// 8. DEMO SEARCH
+// 8. NORMALIZE AND MATCH DEMO QUERIES
 // ========================================
 
-function searchDemoClinics(criteria) {
-    const normalizedQuery = criteria.query.toLowerCase();
+function normalizeText(value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .replace(/\s+/g, " ");
+}
 
-    // Match the specialty against the requested service.
-    // This is a simple demo filter, not medical interpretation.
-    const queryFiltered = DEMO_CLINICS.filter((clinic) => {
+function matchesDemoSpecialty(clinic, query) {
+    const normalizedQuery = normalizeText(query);
+    const normalizedSpecialty = normalizeText(clinic.specialty);
+
+    // Direct specialty matching.
+    if (
+        normalizedSpecialty.includes(normalizedQuery) ||
+        normalizedQuery.includes(normalizedSpecialty)
+    ) {
+        return true;
+    }
+
+    // Match explicitly configured demo keywords.
+    const keywords = DEMO_KEYWORDS[normalizedSpecialty] || [];
+
+    return keywords.some((keyword) => {
+        const normalizedKeyword = normalizeText(keyword);
+
         return (
-            clinic.specialty.toLowerCase().includes(normalizedQuery) ||
-            normalizedQuery.includes(clinic.specialty.toLowerCase())
+            normalizedQuery === normalizedKeyword ||
+            normalizedQuery.includes(normalizedKeyword)
         );
-    });
-
-    // For demo purposes, also allow a general medicine search.
-    const relevantClinics = queryFiltered.length > 0
-        ? queryFiltered
-        : DEMO_CLINICS.filter((clinic) => {
-            return clinic.specialty === "General Medicine" &&
-                normalizedQuery.includes("general");
-        });
-
-    return relevantClinics.filter((clinic) => {
-        const withinRadius = clinic.distanceKm <= criteria.radiusKm;
-
-        const collectionMatches =
-            criteria.homeCollection === "any" ||
-            (
-                criteria.homeCollection === "available" &&
-                clinic.homeCollection
-            ) ||
-            (
-                criteria.homeCollection === "unavailable" &&
-                !clinic.homeCollection
-            );
-
-        return withinRadius && collectionMatches;
     });
 }
 
 
 // ========================================
-// 9. HANDLE SEARCH SUBMISSION
+// 9. FILTER DEMO RECORDS
+// ========================================
+
+function searchDemoClinics(criteria) {
+    return DEMO_CLINICS.filter((clinic) => {
+        const specialtyMatches = matchesDemoSpecialty(
+            clinic,
+            criteria.query
+        );
+
+        const withinDemoRadius =
+            clinic.distanceKm <= criteria.radiusKm;
+
+        const collectionMatches =
+            criteria.homeCollection === "any" ||
+            (
+                criteria.homeCollection === "available" &&
+                clinic.homeCollection === true
+            ) ||
+            (
+                criteria.homeCollection === "unavailable" &&
+                clinic.homeCollection === false
+            );
+
+        return (
+            specialtyMatches &&
+            withinDemoRadius &&
+            collectionMatches
+        );
+    });
+}
+
+
+// ========================================
+// 10. HANDLE FORM SUBMISSION
 // ========================================
 
 async function handleSearch(event) {
@@ -303,45 +353,47 @@ async function handleSearch(event) {
         criteria = getSearchCriteria();
     } catch (error) {
         setSearchStatus(error.message, "error");
-        showMessage("Please correct the search form and try again.");
+
+        showMessage(
+            "Please correct the form and try again."
+        );
+
         return;
     }
 
     setLoading(true);
-    setSearchStatus("Checking backend connection...", "info");
-    showMessage("Loading demo records...");
+
+    setSearchStatus(
+        "Checking backend connection...",
+        "info"
+    );
+
+    showMessage("Preparing demo search...");
 
     try {
-        const isBackendHealthy = await checkBackendHealth();
+        const healthy = await checkBackendHealth();
 
-        if (!isBackendHealthy) {
+        if (!healthy) {
             setSearchStatus(
-                "Cannot reach the backend. Start FastAPI and try again.",
+                "Backend unavailable. Start FastAPI and try again.",
                 "error"
             );
 
             showMessage(
-                "Search is unavailable because the backend health check failed."
+                "The backend health check failed. No search was performed."
             );
 
             return;
         }
 
-        setSearchStatus(
-            "Backend connected. Showing fictional demo records only.",
-            "success"
-        );
-
-        // IMPORTANT:
-        // No real clinic-search API exists yet.
-        // This function filters local fictional records only.
+        // This is a local demo search, NOT a real API search.
         const clinics = searchDemoClinics(criteria);
 
         renderClinics(clinics);
 
         if (clinics.length > 0) {
             setSearchStatus(
-                `Showing ${clinics.length} fictional demo record(s). No real clinics were searched.`,
+                `Backend connected. Showing ${clinics.length} fictional demo record(s). Real clinic search is not implemented.`,
                 "success"
             );
         } else {
@@ -351,7 +403,7 @@ async function handleSearch(event) {
             );
         }
     } catch (error) {
-        console.error("Search failed:", error);
+        console.error("Unexpected search error:", error);
 
         setSearchStatus(
             "An unexpected error occurred. Please try again.",
@@ -366,40 +418,51 @@ async function handleSearch(event) {
 
 
 // ========================================
-// 10. INITIALIZE FRONTEND
+// 11. INITIALIZE APPLICATION
 // ========================================
 
 async function initializeApp() {
-    if (
-        !searchForm ||
-        !locationInput ||
-        !queryInput ||
-        !radiusSelect ||
-        !homeCollectionSelect ||
-        !searchButton ||
-        !searchStatus ||
-        !resultsContainer
-    ) {
+    const requiredElements = [
+        searchForm,
+        locationInput,
+        queryInput,
+        radiusSelect,
+        homeCollectionSelect,
+        searchButton,
+        searchStatus,
+        resultsContainer
+    ];
+
+    if (requiredElements.some((element) => !element)) {
         console.error(
-            "Required HTML elements are missing. Check the element IDs."
+            "A required HTML element is missing. Check the element IDs."
         );
         return;
     }
 
     searchForm.addEventListener("submit", handleSearch);
 
-    setSearchStatus("Checking backend connection...", "info");
+    setSearchStatus(
+        "Checking backend connection...",
+        "info"
+    );
 
-    const isBackendHealthy = await checkBackendHealth();
+    const healthy = await checkBackendHealth();
 
-    if (isBackendHealthy) {
-        setSearchStatus("Backend connected successfully.", "success");
+    if (healthy) {
+        setSearchStatus(
+            "Backend connected. Demo mode is active.",
+            "success"
+        );
     } else {
         setSearchStatus(
-            "Backend is not reachable. Start FastAPI to enable the demo search.",
+            "Backend is not reachable. Start FastAPI to enable demo search.",
             "error"
         );
     }
 }
 
-document.addEventListener("DOMContentLoaded", initializeApp);
+document.addEventListener(
+    "DOMContentLoaded",
+    initializeApp
+);
