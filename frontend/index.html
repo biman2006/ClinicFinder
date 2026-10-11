@@ -1,0 +1,267 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ClinicFinder | Find Nearby Clinics in Kolkata</title>
+
+    <meta
+        name="description"
+        content="Discover clinics and healthcare services in Kolkata."
+    >
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+
+    <!-- 1. Website header -->
+    <header class="site-header">
+        <div class="container header-content">
+
+            <a href="/" class="brand" aria-label="ClinicFinder home">
+                <span class="brand-icon" aria-hidden="true">+</span>
+                <span>ClinicFinder</span>
+            </a>
+
+            <nav class="main-navigation" aria-label="Main navigation">
+                <a href="#search-section">Find Clinics</a>
+                <a href="#results-section">Search Results</a>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <!-- 2. Main page content -->
+    <main class="container">
+
+        <!-- 3. Introduction -->
+        <section class="hero-section" aria-labelledby="page-heading">
+
+            <p class="eyebrow">HEALTHCARE DISCOVERY · KOLKATA</p>
+
+            <h1 id="page-heading">
+                Find healthcare services near you
+            </h1>
+
+            <p class="hero-description">
+                Explore nearby clinics, available services and doctor
+                information using reliable, available data.
+            </p>
+
+        </section>
+
+
+        <!-- 4. Clinic search form -->
+        <section
+            class="search-section"
+            id="search-section"
+            aria-labelledby="search-heading"
+        >
+
+            <h2 id="search-heading">Find the right clinic</h2>
+
+            <p class="section-description">
+                Enter your location and the healthcare service you need.
+            </p>
+
+            <form id="clinic-search-form">
+
+                <!-- Location -->
+                <div class="form-group">
+
+                    <label for="location">Your location</label>
+
+                    <input
+                        type="text"
+                        id="location"
+                        name="location"
+                        placeholder="e.g. New Town, Kolkata"
+                        autocomplete="street-address"
+                        maxlength="200"
+                        required
+                    >
+
+                    <p class="field-hint">
+                        Enter an area, locality or address.
+                    </p>
+
+                </div>
+
+
+                <!-- Search query -->
+                <div class="form-group">
+
+                    <label for="search-query">
+                        Symptoms, known disease or specialty
+                    </label>
+
+                    <textarea
+                        id="search-query"
+                        name="query"
+                        rows="4"
+                        maxlength="1000"
+                        placeholder="e.g. dermatology or a healthcare service you need"
+                        required
+                    ></textarea>
+
+                    <p class="field-hint">
+                        This information helps identify relevant healthcare
+                        services; it does not establish a diagnosis.
+                    </p>
+
+                </div>
+
+
+                <!-- Search filters -->
+                <div class="filter-grid">
+
+                    <div class="form-group">
+
+                        <label for="radius">
+                            Search distance
+                        </label>
+
+                        <select id="radius" name="radius_km">
+                            <option value="2">Within 2 km</option>
+                            <option value="5" selected>Within 5 km</option>
+                            <option value="10">Within 10 km</option>
+                            <option value="20">Within 20 km</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label for="home-collection">
+                            Home sample collection
+                        </label>
+
+                        <select
+                            id="home-collection"
+                            name="home_collection"
+                        >
+                            <option value="any">
+                                Any availability
+                            </option>
+
+                            <option value="available">
+                                Available
+                            </option>
+
+                            <option value="unavailable">
+                                Not available
+                            </option>
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Form submission -->
+                <button
+                    type="submit"
+                    id="search-button"
+                >
+                    Search clinics
+                </button>
+
+                <p
+                    id="search-status"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+
+            </form>
+
+        </section>
+
+
+        <!-- 5. Search results -->
+        <section
+            class="results-section"
+            id="results-section"
+            aria-labelledby="results-heading"
+        >
+
+            <div class="results-header">
+
+                <div>
+                    <h2 id="results-heading">Clinic results</h2>
+
+                    <p class="section-description">
+                        Review the available details before contacting a clinic.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <!-- JavaScript will display API results here -->
+            <div
+                id="clinic-results"
+                class="clinic-results"
+                aria-live="polite"
+                aria-busy="false"
+            >
+
+                <p class="empty-state">
+                    Enter your search details to explore clinics.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- 6. Healthcare information notice -->
+        <aside
+            class="healthcare-notice"
+            aria-labelledby="notice-heading"
+        >
+
+            <h2 id="notice-heading">Important information</h2>
+
+            <p>
+                ClinicFinder helps users discover healthcare services.
+                It does not diagnose conditions, prescribe medication or
+                replace professional medical advice.
+            </p>
+
+            <p>
+                Clinic, doctor, rating, service and medicine information
+                will be displayed only when supported by the configured
+                data source. Unverified information must be clearly labelled.
+            </p>
+
+        </aside>
+
+    </main>
+
+
+    <!-- 7. Website footer -->
+    <footer class="site-footer">
+
+        <div class="container">
+
+            <p>
+                &copy; 2026 ClinicFinder
+            </p>
+
+            <p>
+                Healthcare discovery for Kolkata, West Bengal.
+            </p>
+
+        </div>
+
+    </footer>
+
+</body>
+</html>

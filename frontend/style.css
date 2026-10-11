@@ -1,0 +1,399 @@
+
+/* ========================================
+   1. GLOBAL RESET AND DESIGN VARIABLES
+======================================== */
+
+:root {
+    --primary: #087f8c;
+    --primary-dark: #066873;
+    --text-primary: #183344;
+    --text-secondary: #617586;
+    --background: #f4f8fb;
+    --surface: #ffffff;
+    --border: #dce5ec;
+    --notice-background: #eaf6f7;
+    --shadow: 0 8px 28px rgba(24, 51, 68, 0.07);
+    --radius: 14px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--text-primary);
+    background: var(--background);
+    line-height: 1.6;
+}
+
+
+/* ========================================
+   2. REUSABLE CONTAINER
+======================================== */
+
+.container {
+    width: min(1120px, 92%);
+    margin-inline: auto;
+}
+
+
+/* ========================================
+   3. WEBSITE HEADER
+======================================== */
+
+.site-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.header-content {
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.brand-icon {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    font-size: 26px;
+    line-height: 1;
+}
+
+.main-navigation {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.main-navigation a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.main-navigation a:hover {
+    color: var(--primary);
+}
+
+
+/* ========================================
+   4. INTRODUCTION / HERO SECTION
+======================================== */
+
+.hero-section {
+    padding: 58px 0 32px;
+    text-align: center;
+}
+
+.eyebrow {
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+}
+
+.hero-section h1 {
+    max-width: 750px;
+    margin: 0 auto 14px;
+    font-size: clamp(30px, 4vw, 44px);
+    line-height: 1.2;
+    letter-spacing: -1px;
+}
+
+.hero-description {
+    max-width: 620px;
+    margin-inline: auto;
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+
+/* ========================================
+   5. SEARCH CARD
+======================================== */
+
+.search-section {
+    max-width: 800px;
+    margin: 0 auto 32px;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.search-section h2,
+.results-section h2,
+.healthcare-notice h2 {
+    font-size: 22px;
+    line-height: 1.35;
+    margin-bottom: 8px;
+}
+
+.section-description {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.search-section > .section-description {
+    margin-bottom: 26px;
+}
+
+
+/* ========================================
+   6. FORM FIELDS
+======================================== */
+
+.form-group {
+    min-width: 0;
+    margin-bottom: 22px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+input,
+textarea,
+select {
+    display: block;
+    width: 100%;
+    min-height: 46px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 14px;
+}
+
+textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #8796a3;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: 3px solid rgba(8, 127, 140, 0.2);
+    border-color: var(--primary);
+}
+
+.field-hint {
+    margin-top: 7px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+
+/* ========================================
+   7. SEARCH FILTERS
+======================================== */
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.filter-grid .form-group {
+    margin-bottom: 24px;
+}
+
+
+/* ========================================
+   8. BUTTONS
+======================================== */
+
+button {
+    min-height: 46px;
+    padding: 12px 22px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+button:hover {
+    background: var(--primary-dark);
+}
+
+button:focus-visible {
+    outline: 3px solid rgba(8, 127, 140, 0.35);
+    outline-offset: 3px;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#search-button {
+    width: 100%;
+}
+
+
+/* ========================================
+   9. SEARCH STATUS AND RESULTS
+======================================== */
+
+#search-status {
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.results-section {
+    margin-bottom: 30px;
+}
+
+.results-header {
+    margin-bottom: 18px;
+}
+
+.clinic-results {
+    display: grid;
+    gap: 16px;
+}
+
+.empty-state {
+    padding: 28px 20px;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+
+/* ========================================
+   10. HEALTHCARE NOTICE
+======================================== */
+
+.healthcare-notice {
+    margin-bottom: 38px;
+    padding: 22px;
+    background: var(--notice-background);
+    border: 1px solid #c9e8e9;
+    border-radius: 10px;
+}
+
+.healthcare-notice h2 {
+    font-size: 17px;
+}
+
+.healthcare-notice p {
+    color: #435f6c;
+    font-size: 13px;
+}
+
+.healthcare-notice p + p {
+    margin-top: 8px;
+}
+
+
+/* ========================================
+   11. FOOTER
+======================================== */
+
+.site-footer {
+    padding: 24px 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+
+.site-footer p {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.site-footer p + p {
+    margin-top: 4px;
+}
+
+
+/* ========================================
+   12. RESPONSIVE DESIGN
+======================================== */
+
+@media (max-width: 650px) {
+
+    .header-content {
+        min-height: auto;
+        padding-top: 16px;
+        padding-bottom: 16px;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .main-navigation {
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .hero-section {
+        padding-top: 38px;
+        padding-bottom: 26px;
+    }
+
+    .hero-section h1 {
+        font-size: 32px;
+    }
+
+    .search-section {
+        padding: 22px 18px;
+    }
+
+    .filter-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .search-section h2,
+    .results-section h2 {
+        font-size: 20px;
+    }
+
+}
