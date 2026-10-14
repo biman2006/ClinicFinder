@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from backend.integrations.overpass import OverpassClinicProvider
+from backend.integrations.composite import CompositeClinicProvider
+from backend.integrations.directory import ClinicDirectory, DirectoryClinicProvider
+from backend.core.config import ProviderSettings
 from backend.integrations.provider import (
     ClinicDataProvider,
     ProviderError,
@@ -21,7 +24,13 @@ _provider: ClinicDataProvider | None = None
 def get_clinic_provider() -> Generator[ClinicDataProvider, None, None]:
     global _provider
     if _provider is None:
-        _provider = OverpassClinicProvider()
+        settings = ProviderSettings.from_environment()
+        _provider = CompositeClinicProvider(
+            [
+                OverpassClinicProvider(settings=settings),
+                DirectoryClinicProvider(ClinicDirectory(settings.directory_path)),
+            ]
+        )
     yield _provider
 
 
@@ -39,7 +48,22 @@ async def search_clinics(
     except ProviderError as exc:
         return _provider_error(502, exc)
 
-    return ProviderResults(items=items)
+    source_status = getattr(provider, "last_source_status", {})
+    failed_sources = {
+        name for name, status in source_status.items() if status != "ok"
+    }
+    result_status = (
+        "no_matches"
+        if not items
+        else "partial"
+        if failed_sources
+        else "complete"
+    )
+    return ProviderResults(
+        items=items,
+        result_status=result_status,
+        source_status=source_status,
+    )
 
 
 def _provider_error(status_code: int, error: ProviderError) -> JSONResponse:
@@ -48,12 +72,13 @@ def _provider_error(status_code: int, error: ProviderError) -> JSONResponse:
         "PROVIDER_INVALID_RESPONSE": "The clinic data provider returned an invalid response.",
         "PROVIDER_ERROR": "The clinic data provider could not process the search.",
     }
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": {
-                "code": error.code,
-                "message": public_messages.get(error.code, public_messages["PROVIDER_ERROR"]),
-            }
-        },
-    )
+    content = {
+        "error": {
+            "code": error.code,
+            "message": public_messages.get(error.code, public_messages["PROVIDER_ERROR"]),
+        }
+    }
+    source_status = getattr(error, "source_status", {})
+    if source_status:
+        content["source_status"] = source_status
+    return JSONResponse(status_code=status_code, content=content)

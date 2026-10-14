@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.clinics import router as clinics_router
 from backend.api.locations import router as locations_router
+from backend.api.admin import router as admin_router
 
 app = FastAPI(
     title="Clinic Discovery API",
@@ -12,16 +13,19 @@ app = FastAPI(
 
 app.include_router(clinics_router)
 app.include_router(locations_router)
+app.include_router(admin_router)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5500",
         "http://127.0.0.1:5500",
+        "http://localhost:5501",
+        "http://127.0.0.1:5501",
     ],
     allow_credentials=False,
-    allow_methods=["GET"],
-    allow_headers=["Accept"],
+    allow_methods=["GET", "POST", "PUT"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
 

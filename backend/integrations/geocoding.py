@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Mapping
 import logging
+import re
 import time
 from typing import Any
 from urllib.parse import urlsplit
@@ -13,6 +14,16 @@ from backend.schemas.provider import GeocodedLocation, LocationSearchParams
 
 
 logger = logging.getLogger(__name__)
+
+# These are confirmed user spellings for Kolkata locality/landmark searches.
+# Landmarks are intentionally kept as landmarks; they are not converted to a
+# broader locality or assigned invented coordinates.
+KOLKATA_LOCATION_ALIASES = {
+    "new town": "New Town, Kolkata, West Bengal, India",
+    "newtown": "New Town, Kolkata, West Bengal, India",
+    "biswa bangla": "Biswa Bangla Gate, New Town, Kolkata, West Bengal, India",
+    "biswa bangla gate": "Biswa Bangla Gate, New Town, Kolkata, West Bengal, India",
+}
 
 
 class NominatimGeocoder:
@@ -34,6 +45,7 @@ class NominatimGeocoder:
         )
         self._rate_limit_lock = asyncio.Lock()
         self._last_request_at: float | None = None
+        self._cache: dict[str, list[GeocodedLocation]] = {}
 
     async def close(self) -> None:
         if self._owns_client:
@@ -42,12 +54,19 @@ class NominatimGeocoder:
     async def search(
         self, params: LocationSearchParams
     ) -> list[GeocodedLocation]:
+        query = normalize_location_query(params.query)
+        provider_query = expand_kolkata_location_alias(query)
+        cache_key = provider_query.casefold()
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
         await self._wait_for_rate_limit()
         try:
             response = await self._client.get(
                 self.settings.nominatim_endpoint,
                 params={
-                    "q": params.query,
+                    "q": provider_query,
                     "format": "jsonv2",
                     "limit": 5,
                     "addressdetails": 1,
@@ -95,6 +114,7 @@ class NominatimGeocoder:
                 locations.append(location)
         if payload and not locations:
             raise ProviderResponseError("The location provider returned invalid results.")
+        self._cache[cache_key] = list(locations)
         return locations
 
     async def _wait_for_rate_limit(self) -> None:
@@ -121,13 +141,44 @@ def _parse_result(item: Any) -> GeocodedLocation | None:
         return None
     osm_type = item.get("osm_type")
     osm_id = item.get("osm_id")
+    address_context = _address_context(item.get("address"))
     return GeocodedLocation(
         display_name=display_name.strip(),
         latitude=latitude,
         longitude=longitude,
         osm_type=osm_type if isinstance(osm_type, str) else None,
         osm_id=osm_id if isinstance(osm_id, int) else None,
+        address_context=address_context,
     )
+
+
+def normalize_location_query(query: str) -> str:
+    return re.sub(r"\s+", " ", query).strip().casefold()
+
+
+def expand_kolkata_location_alias(query: str) -> str:
+    return KOLKATA_LOCATION_ALIASES.get(query, query)
+
+
+def _address_context(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    keys = (
+        "neighbourhood",
+        "suburb",
+        "city_district",
+        "town",
+        "city",
+        "state_district",
+        "state",
+        "country",
+        "postcode",
+    )
+    return {
+        key: item.strip()
+        for key in keys
+        if isinstance(item := value.get(key), str) and item.strip()
+    }
 
 
 def _finite_float(value: Any) -> float | None:

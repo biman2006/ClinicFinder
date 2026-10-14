@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+backend/data/*.sqlite3
 
 # Virtual environments
 venv/
@@ -17,3 +18,15 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local clinic directory and backups
+backend/data/*.sqlite3
+backend/data/*.sqlite3-*
+
+# Large OpenStreetMap extracts
+backend/data/*.osm.pbf
+
+# Local import reports
+backend/data/last-osm-import.json
+backend/data/osm-*-dry-run*.json
+backend/data/osm-dry-run.json

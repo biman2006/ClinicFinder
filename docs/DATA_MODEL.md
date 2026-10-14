@@ -2,12 +2,34 @@
 
 This is a conceptual model; it is not a migration file. Confirm booking, verification, and provider choices before implementation.
 
+## ClinicFinder directory branch
+
+The MVP uses SQLite because the repository had no existing persistence layer.
+The `clinic_branches` table stores a stable internal UUID, official facility
+and branch names, facility type (`clinic`, `diagnostic_centre`, or `hospital`),
+complete address fields, coordinates, phone/website when confirmed, a JSON
+map of field-level sources, operating status, `pending | verified |
+deactivated` lifecycle, verification timestamp, and last-updated timestamp.
+Manually entered rows participate in public search only after verification.
+Offline OpenStreetMap import rows may participate as explicitly unverified
+source listings, while remaining pending and never being presented as
+administrator-verified or operational.
+
+The correction process is: update the source-backed fields, keep the record
+pending, confirm the actual branch and coordinates, then verify it again.
+Records that cannot be re-confirmed are deactivated rather than silently
+retained.
+
 ## Clinic
 - `id`: UUID primary key
 - `name`: required
 - `address`: nullable until verified
+- `locality`, `city`, `postal_code`: nullable provider address components
+- `address_status`: `complete | incomplete | unknown`; a postal-code-only
+  value is incomplete
 - `latitude`, `longitude`: nullable numeric values
 - `phone`, `website`: nullable
+- `source_data`: provider payload fields retained for traceability
 - `listing_status`: `draft | pending_verification | verified | suspended`
 - `created_at`, `updated_at`
 

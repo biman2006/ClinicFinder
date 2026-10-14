@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from backend.integrations.geocoding import NominatimGeocoder
+from backend.integrations.local_locations import (
+    KOLKATA_LOCATION_SUGGESTIONS,
+    find_local_location_suggestions,
+)
 from backend.integrations.provider import (
     ProviderError,
     ProviderResponseError,
@@ -21,6 +25,17 @@ def get_geocoder() -> Generator[NominatimGeocoder, None, None]:
     if _geocoder is None:
         _geocoder = NominatimGeocoder()
     yield _geocoder
+
+
+@router.get("/suggestions")
+def location_suggestions(query: str = "") -> dict[str, list[dict[str, object]]]:
+    """Return local catalogue entries without contacting Nominatim."""
+    suggestions = (
+        find_local_location_suggestions(query)
+        if query.strip()
+        else list(KOLKATA_LOCATION_SUGGESTIONS)
+    )
+    return {"items": [suggestion.as_dict() for suggestion in suggestions]}
 
 
 @router.get("/search", response_model=GeocodingResults)

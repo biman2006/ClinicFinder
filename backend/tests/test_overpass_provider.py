@@ -61,22 +61,20 @@ def test_parses_node_and_normalizes_contact_fields() -> None:
 
     results = run(provider.search(search_params()))
 
-    assert results[0].model_dump(exclude_none=True) == {
-        "name": "Example Clinic",
-        "address": "Park Street, Kolkata",
-        "latitude": 22.57,
-        "longitude": 88.36,
-        "phone": "+91 123",
-        "website": "https://example.test",
-        "services": ["general", "dermatology"],
-        "opening_status": "unknown",
-        "doctors": [],
-        "match_reasons": [],
-        "data_sources": ["OpenStreetMap"],
-        "source_id": 101,
-        "source_type": "node",
-        "verification_status": "unverified",
-    }
+    result = results[0]
+    assert result.name == "Example Clinic"
+    assert result.address == "Park Street, Kolkata"
+    assert result.city == "Kolkata"
+    assert result.address_status == "complete"
+    assert result.phone == "+91 123"
+    assert result.website == "https://example.test"
+    assert result.services == ["general", "dermatology"]
+    assert result.data_sources == ["OpenStreetMap"]
+    assert result.source_data["addr:city"] == "Kolkata"
+    assert result.source_id == 101
+    assert result.source_type == "node"
+    assert result.verification_status == "unverified"
+    assert result.distance_km is not None and result.distance_km < 1
 
 
 def test_parses_way_using_center_coordinates() -> None:
@@ -100,10 +98,49 @@ def test_parses_way_using_center_coordinates() -> None:
     assert (result.latitude, result.longitude) == (22.58, 88.37)
 
 
+def test_parses_relation_using_center_coordinates() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "relation",
+                    "id": 203,
+                    "center": {"lat": 22.58, "lon": 88.37},
+                    "tags": {"name": "Relation Clinic"},
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.source_type == "relation"
+    assert result.source_id == 203
+    assert (result.latitude, result.longitude) == (22.58, 88.37)
+
+
+def test_invalid_coordinates_are_skipped() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 204,
+                    "lat": 999,
+                    "lon": 88.37,
+                    "tags": {"name": "Invalid Clinic"},
+                }
+            ]
+        )
+    )
+
+    assert run(provider.search(search_params())) == []
+
+
 def test_missing_optional_tags_remain_null_or_empty() -> None:
     provider = make_provider(
         lambda request: response(
-            [{"type": "node", "id": 303, "lat": 22.5, "lon": 88.3, "tags": {"name": "Minimal"}}]
+            [{"type": "node", "id": 303, "lat": 22.57, "lon": 88.36, "tags": {"name": "Minimal"}}]
         )
     )
 
@@ -113,6 +150,24 @@ def test_missing_optional_tags_remain_null_or_empty() -> None:
     assert result.phone is None
     assert result.website is None
     assert result.services == []
+
+
+def test_elements_without_names_are_skipped_without_fabricating_names() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 304,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {"amenity": "clinic"},
+                }
+            ]
+        )
+    )
+
+    assert run(provider.search(search_params())) == []
 
 
 def test_malformed_provider_response_raises_structured_error() -> None:
@@ -136,8 +191,11 @@ def test_timeout_raises_provider_unavailable_error() -> None:
     assert error.value.code == "PROVIDER_UNAVAILABLE"
 
 
-def test_non_success_response_raises_provider_unavailable_error() -> None:
-    provider = make_provider(lambda request: httpx.Response(503))
+@pytest.mark.parametrize("status_code", [429, 503, 504])
+def test_non_success_response_raises_provider_unavailable_error(
+    status_code: int,
+) -> None:
+    provider = make_provider(lambda request: httpx.Response(status_code))
 
     with pytest.raises(ProviderUnavailableError) as error:
         run(provider.search(search_params()))
@@ -145,12 +203,34 @@ def test_non_success_response_raises_provider_unavailable_error() -> None:
     assert error.value.code == "PROVIDER_UNAVAILABLE"
 
 
+@pytest.mark.parametrize(
+    ("status_code", "category"),
+    [(429, "rate_limited"), (504, "gateway_timeout")],
+)
+def test_http_failures_log_safe_status_category(
+    status_code: int,
+    category: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    provider = make_provider(lambda request: httpx.Response(status_code))
+
+    with caplog.at_level("WARNING"):
+        with pytest.raises(ProviderUnavailableError):
+            run(provider.search(search_params()))
+
+    record = next(record for record in caplog.records if record.message == "Overpass provider request failed")
+    assert record.provider_failure_category == category
+    assert record.provider_http_status == status_code
+    assert record.provider_exception_type == "HTTPStatusError"
+    assert record.provider_query_length > 0
+
+
 def test_duplicate_source_elements_are_deduplicated_without_name_merging() -> None:
     provider = make_provider(
         lambda request: response(
             [
-                {"type": "node", "id": 1, "lat": 22.5, "lon": 88.3, "tags": {"name": "Same"}},
-                {"type": "node", "id": 1, "lat": 22.5, "lon": 88.3, "tags": {"name": "Same"}},
+                {"type": "node", "id": 1, "lat": 22.57, "lon": 88.36, "tags": {"name": "Same"}},
+                {"type": "node", "id": 1, "lat": 22.57, "lon": 88.36, "tags": {"name": "Same"}},
                 {"type": "way", "id": 1, "center": {"lat": 22.6, "lon": 88.4}, "tags": {"name": "Same"}},
             ]
         )
@@ -162,6 +242,47 @@ def test_duplicate_source_elements_are_deduplicated_without_name_merging() -> No
         ("node", 1),
         ("way", 1),
     ]
+
+
+def test_filters_provider_results_outside_requested_radius() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 404,
+                    "lat": 22.7,
+                    "lon": 88.5,
+                    "tags": {"name": "Outside"},
+                }
+            ]
+        )
+    )
+
+    assert run(provider.search(search_params())) == []
+
+
+def test_marks_pin_only_address_as_incomplete() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 505,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {"name": "Pin Only", "addr:postcode": "700001"},
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.address is None
+    assert result.postal_code == "700001"
+    assert result.postal_code == "700001"
+    assert result.address_status == "incomplete"
 
 
 def test_query_uses_validated_numeric_values_and_configured_timeout() -> None:

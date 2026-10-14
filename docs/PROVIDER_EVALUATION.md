@@ -341,7 +341,11 @@ public search API. Results are unverified listings; an OSM element does not
 prove that a clinic is operating, accurate, complete, or accepting patients.
 The adapter does not retry public Overpass requests and reports provider
 timeouts, transport failures, non-success responses and malformed payloads as
-safe structured errors. It does not use Nominatim.
+safe structured errors. HTTP 429 and 504 failures are logged with the
+categories `rate_limited` and `gateway_timeout`; logs include only the
+sanitized endpoint, status/category, exception type, and query length. Query
+coordinates, response bodies, and user-entered location text are not logged.
+It does not use Nominatim.
 
 Configuration is available through `CLINIC_PROVIDER_OVERPASS_ENDPOINT` and
 `CLINIC_PROVIDER_TIMEOUT_SECONDS`. Tests mock all provider responses and can be

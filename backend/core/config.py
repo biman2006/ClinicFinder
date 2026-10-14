@@ -7,6 +7,8 @@ DEFAULT_PROVIDER_TIMEOUT_SECONDS = 20.0
 DEFAULT_NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search"
 DEFAULT_GEOCODING_TIMEOUT_SECONDS = 10.0
 DEFAULT_GEOCODING_MIN_INTERVAL_SECONDS = 1.0
+DEFAULT_DIRECTORY_PATH = "backend/data/clinic_directory.sqlite3"
+DEFAULT_DIRECTORY_STALE_AFTER_DAYS = 180
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,9 @@ class ProviderSettings:
     nominatim_endpoint: str = DEFAULT_NOMINATIM_ENDPOINT
     geocoding_timeout_seconds: float = DEFAULT_GEOCODING_TIMEOUT_SECONDS
     geocoding_min_interval_seconds: float = DEFAULT_GEOCODING_MIN_INTERVAL_SECONDS
+    directory_path: str = DEFAULT_DIRECTORY_PATH
+    admin_token: str | None = None
+    directory_stale_after_days: int = DEFAULT_DIRECTORY_STALE_AFTER_DAYS
 
     @classmethod
     def from_environment(cls) -> "ProviderSettings":
@@ -44,9 +49,16 @@ class ProviderSettings:
             "CLINIC_GEOCODING_MIN_INTERVAL_SECONDS",
             str(DEFAULT_GEOCODING_MIN_INTERVAL_SECONDS),
         )
+        directory_path = os.getenv("CLINIC_DIRECTORY_PATH", DEFAULT_DIRECTORY_PATH)
+        admin_token = os.getenv("CLINIC_ADMIN_TOKEN") or None
+        stale_days_value = os.getenv(
+            "CLINIC_DIRECTORY_STALE_AFTER_DAYS",
+            str(DEFAULT_DIRECTORY_STALE_AFTER_DAYS),
+        )
         try:
             geocoding_timeout = float(geocoding_timeout_value)
             interval = float(interval_value)
+            stale_days = int(stale_days_value)
         except ValueError as exc:
             raise ValueError(
                 "Geocoding timeout and interval settings must be numbers"
@@ -57,10 +69,15 @@ class ProviderSettings:
             raise ValueError("CLINIC_GEOCODING_TIMEOUT_SECONDS must be greater than zero")
         if interval < 0:
             raise ValueError("CLINIC_GEOCODING_MIN_INTERVAL_SECONDS must not be negative")
+        if stale_days <= 0:
+            raise ValueError("CLINIC_DIRECTORY_STALE_AFTER_DAYS must be greater than zero")
         return cls(
             overpass_endpoint=endpoint,
             provider_timeout_seconds=timeout,
             nominatim_endpoint=geocoding_endpoint,
             geocoding_timeout_seconds=geocoding_timeout,
             geocoding_min_interval_seconds=interval,
+            directory_path=directory_path,
+            admin_token=admin_token,
+            directory_stale_after_days=stale_days,
         )

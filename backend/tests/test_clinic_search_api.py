@@ -21,6 +21,16 @@ class StubProvider:
         return self.result
 
 
+class StubCompositeProvider(StubProvider):
+    def __init__(
+        self,
+        result: list[ClinicListing] | Exception,
+        source_status: dict[str, str],
+    ) -> None:
+        super().__init__(result)
+        self.last_source_status = source_status
+
+
 def listing() -> ClinicListing:
     return ClinicListing(
         name="Example Clinic",
@@ -122,6 +132,44 @@ def test_search_maps_provider_response_error_to_safe_502(client: TestClient) -> 
             "code": "PROVIDER_INVALID_RESPONSE",
             "message": "The clinic data provider returned an invalid response.",
         }
+    }
+
+
+def test_search_returns_partial_metadata_when_one_source_fails(client: TestClient) -> None:
+    override_provider(
+        StubCompositeProvider(
+            [listing()],
+            {"overpass": "unavailable", "directory": "ok"},
+        )
+    )
+    try:
+        response = client.get(
+            "/clinics/search",
+            params={"latitude": 22, "longitude": 88, "radius_km": 5},
+        )
+    finally:
+        clear_provider_override()
+
+    assert response.status_code == 200
+    assert response.json()["result_status"] == "partial"
+    assert response.json()["source_status"]["overpass"] == "unavailable"
+
+
+def test_search_returns_no_matches_when_source_succeeds_empty(client: TestClient) -> None:
+    override_provider(StubCompositeProvider([], {"overpass": "unavailable", "directory": "ok"}))
+    try:
+        response = client.get(
+            "/clinics/search",
+            params={"latitude": 22, "longitude": 88, "radius_km": 5},
+        )
+    finally:
+        clear_provider_override()
+
+    assert response.status_code == 200
+    assert response.json()["result_status"] == "no_matches"
+    assert response.json()["source_status"] == {
+        "overpass": "unavailable",
+        "directory": "ok",
     }
 
 

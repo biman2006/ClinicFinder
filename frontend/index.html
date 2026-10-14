@@ -85,12 +85,23 @@
                         placeholder="e.g. New Town, Kolkata"
                         autocomplete="street-address"
                         maxlength="200"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-controls="location-suggestions"
+                        aria-expanded="false"
                     >
 
+                    <div
+                        id="location-suggestions"
+                        class="location-suggestions"
+                        role="listbox"
+                        aria-label="Kolkata location suggestions"
+                    ></div>
+
                     <p class="field-hint">
-                        This field is informational only. Text locations are not
-                        geocoded in the browser. The backend uses
-                        OpenStreetMap Nominatim once after submission.
+                        Choose a Kolkata suggestion for instant search, or
+                        submit another area for one-time OpenStreetMap
+                        geocoding.
                     </p>
 
                 </div>

@@ -20,15 +20,14 @@ FastAPI backend (Python; proposed)
   ├── Symptom/condition-to-specialty mapping
   ├── Clinic filtering and explainable ranking
   ├── Clinic/service claim query service
-  ├── Provider adapter interface (provider TBD)
-  └── Later: authentication, clinic admin, booking
+  ├── Provider adapter interface (OSM + local directory)
+  ├── Authenticated directory administration
+  └── Later: clinic staff onboarding, booking
               |
               v
-PostgreSQL (proposed; PostGIS optional)
-  ├── internal clinic and specialty records
-  ├── data claims + source/freshness metadata
-  ├── pharmacy association records
-  └── later: users, schedules, slots, appointments, audit events
+SQLite MVP (replaceable persistence adapter)
+  ├── independently verified clinic branches
+  └── source, verification and freshness metadata
 ```
 
 ## 3. Modules
@@ -37,7 +36,8 @@ PostgreSQL (proposed; PostGIS optional)
 - `repositories/`: database access.
 - `models/`: SQLAlchemy entities.
 - `schemas/`: API contracts.
-- `integrations/`: provider adapters only; do not spread provider-specific payloads through the codebase. The current evaluation foundation contains an OpenStreetMap/Overpass adapter with normalized, unverified listings; it is not yet a selected production provider.
+- `integrations/`: provider adapters only; do not spread provider-specific payloads through the codebase. The current implementation has an OpenStreetMap/Overpass adapter and a SQLite-backed directory adapter combined by a provider-neutral composite.
+- `api/admin.py`: authenticated review, verification, correction and deactivation workflow for directory branches.
 - `core/`: settings, logging, error handling and security.
 - `tests/`: unit and API integration tests.
 
@@ -46,13 +46,27 @@ PostgreSQL (proposed; PostGIS optional)
 2. Resolve text location to coordinates using the selected provider, or accept device coordinates with permission.
 3. Match symptoms/known condition to candidate specialties using a reviewed, versioned mapping. Do not diagnose.
 4. Query the selected clinic/place data source and internal verified records.
-5. Normalize results and attach source/freshness/verification metadata.
-6. Apply distance and relevant-service filters.
-7. Rank with explainable criteria such as distance, supported service match, opening status when current hours are available, and source confidence. Do not treat star ratings alone as clinical quality.
-8. Return `match_reasons`, `data_sources`, `last_verified_at`, and unknown values explicitly.
+5. Normalize results and attach source/freshness/verification metadata. A
+   directory record is eligible only when active and administrator-verified.
+6. Calculate geographic distance and exclude listings without coordinates or
+   outside the requested radius. Deduplicate by stable source identity, then
+   conservatively merge a verified directory branch with a matching OSM
+   listing while retaining both provenance records.
+7. Apply relevant-service filters.
+8. Rank with explainable criteria such as distance, supported service match,
+   opening status when current hours are available, and source confidence. Do
+   not treat star ratings alone as clinical quality.
+9. Return `match_reasons`, `data_sources`, `last_verified_at`, raw provider
+   provenance, and unknown values explicitly.
 
 ## 5. Provider selection gate
-The source is undecided. Evaluate candidates against: Kolkata coverage, permitted use of clinic/place details, review/rating terms, storage/caching rules, attribution, price/quotas, reliability, geocoding, opening-hours freshness, and whether the source has any clinic-specific service data. A general place provider is not assumed to supply doctor affiliations, home collection, medicine stock, or bookable slots.
+The current external source remains an evaluation source, not a coverage
+guarantee. Evaluate external candidates against: Kolkata coverage, permitted
+use of clinic/place details, review/rating terms, storage/caching rules,
+attribution, price/quotas, reliability, geocoding, opening-hours freshness,
+and whether the source has any clinic-specific service data. A general place
+provider is not assumed to supply doctor affiliations, home collection,
+medicine stock, or bookable slots.
 
 The provider foundation accepts validated coordinate/radius searches and keeps
 provider-specific request and response handling behind the adapter boundary.
