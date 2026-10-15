@@ -44,6 +44,43 @@ def test_only_verified_directory_branches_are_searchable(tmp_path: Path) -> None
     assert results[0].field_sources["address"] == "official branch confirmation"
 
 
+@pytest.mark.parametrize(
+    ("address", "postal_code", "district", "expected_status"),
+    [
+        ("", None, None, "unknown"),
+        ("", "700001", None, "incomplete"),
+        ("Beltola Road", None, None, "complete"),
+    ],
+)
+def test_manual_directory_address_status_uses_directory_address_field(
+    tmp_path: Path,
+    address: str,
+    postal_code: str | None,
+    district: str | None,
+    expected_status: str,
+) -> None:
+    directory = ClinicDirectory(tmp_path / "directory.sqlite3")
+    input_data = branch().model_copy(
+        update={
+            "address": address,
+            "locality": None,
+            "city": None,
+            "postal_code": postal_code,
+            "district": district,
+        }
+    )
+    record = directory.add(input_data)
+    directory.update(record.id, input_data, verify=True)
+
+    results = asyncio.run(
+        DirectoryClinicProvider(directory).search(
+            ClinicSearchParams(latitude=22.76, longitude=88.37, radius_km=1)
+        )
+    )
+
+    assert results[0].address_status == expected_status
+
+
 def test_directory_filters_radius_and_preserves_similar_branches(tmp_path: Path) -> None:
     directory = ClinicDirectory(tmp_path / "directory.sqlite3")
     first = directory.add(branch("Jibok Clinic"))

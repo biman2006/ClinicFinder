@@ -281,6 +281,18 @@ class ClinicDirectory:
             district = address_parts.get("district") or record.district
             city = address_parts.get("city") or record.city
             postal_code = address_parts.get("postal_code") or record.postal_code
+            status_parts = (
+                address_parts
+                if is_imported
+                else {
+                    "address": address,
+                    "full_address": address,
+                    "locality": locality,
+                    "district": district,
+                    "city": city,
+                    "postal_code": postal_code,
+                }
+            )
             results.append(
                 ClinicListing(
                     clinic_id=record.id,
@@ -291,11 +303,7 @@ class ClinicDirectory:
                     district=district,
                     city=city,
                     postal_code=postal_code,
-                    address_status=(
-                        address_status(address_parts)
-                        if is_imported
-                        else ("complete" if address else "unknown")
-                    ),
+                    address_status=address_status(status_parts),
                     latitude=record.latitude,
                     longitude=record.longitude,
                     phone=record.phone,

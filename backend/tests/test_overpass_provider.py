@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from backend.core.config import ProviderSettings
+from backend.integrations.osm import address_status
 from backend.integrations.overpass import OverpassClinicProvider, build_overpass_query
 from backend.integrations.provider import ProviderResponseError, ProviderUnavailableError
 from backend.schemas.provider import ClinicSearchParams
@@ -37,6 +38,21 @@ def response(elements: list[dict[str, Any]]) -> httpx.Response:
     return httpx.Response(200, json={"elements": elements})
 
 
+@pytest.mark.parametrize(
+    ("parts", "expected"),
+    [
+        ({}, "unknown"),
+        ({"street": "Beltola Road"}, "incomplete"),
+        ({"postal_code": "700001"}, "incomplete"),
+        ({"district": "Kolkata"}, "incomplete"),
+        ({"housenumber": "52/2B", "street": "Hazra Road"}, "complete"),
+        ({"full_address": "20/C, Broad Street,(Ballygunge)"}, "complete"),
+    ],
+)
+def test_address_status_classification(parts: dict[str, str], expected: str) -> None:
+    assert address_status(parts) == expected
+
+
 def test_parses_node_and_normalizes_contact_fields() -> None:
     provider = make_provider(
         lambda request: response(
@@ -65,7 +81,7 @@ def test_parses_node_and_normalizes_contact_fields() -> None:
     assert result.name == "Example Clinic"
     assert result.address == "Park Street, Kolkata"
     assert result.city == "Kolkata"
-    assert result.address_status == "complete"
+    assert result.address_status == "incomplete"
     assert result.phone == "+91 123"
     assert result.website == "https://example.test"
     assert result.services == ["general", "dermatology"]
@@ -104,6 +120,7 @@ def test_preserves_district_separately_from_city_and_locality() -> None:
     assert result.locality is None
     assert result.city is None
     assert result.postal_code == "700019"
+    assert result.address_status == "complete"
 
 
 def test_preserves_explicit_locality_without_inference() -> None:

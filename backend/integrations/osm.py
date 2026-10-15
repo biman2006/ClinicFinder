@@ -66,17 +66,30 @@ def osm_address_parts(tags: Mapping[str, Any]) -> dict[str, str | None]:
         "district": _tag_text(tags, "addr:district"),
         "city": _first_tag(tags, "addr:city", "addr:town", "addr:municipality"),
         "postal_code": _first_tag(tags, "addr:postcode", "addr:postalcode"),
+        "full_address": full,
     }
 
 
 def address_status(parts: Mapping[str, str | None]) -> str:
-    if not any(parts.get(key) for key in ("address", "housenumber", "street", "locality", "city", "postal_code")):
-        return "unknown"
-    if parts.get("postal_code") and not any(
-        parts.get(key) for key in ("address", "housenumber", "street", "locality", "city")
+    if not any(
+        parts.get(key)
+        for key in (
+            "address",
+            "full_address",
+            "housenumber",
+            "street",
+            "locality",
+            "district",
+            "city",
+            "postal_code",
+        )
     ):
-        return "incomplete"
-    return "complete"
+        return "unknown"
+    if parts.get("full_address") or (
+        parts.get("housenumber") and parts.get("street")
+    ):
+        return "complete"
+    return "incomplete"
 
 
 def _first_tag(tags: Mapping[str, Any], *keys: str) -> str | None:
