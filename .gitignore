@@ -30,3 +30,5 @@ backend/data/*.osm.pbf
 backend/data/last-osm-import.json
 backend/data/osm-*-dry-run*.json
 backend/data/osm-dry-run.json
+/ClinicFinder Kolkata Search Results.png
+/IMPLEMENTATION_CONCLUSION.txt
