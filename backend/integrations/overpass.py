@@ -204,6 +204,10 @@ def build_overpass_query(
         "("
         f'nwr["amenity"="clinic"](around:{radius_m},{latitude},{longitude});'
         f'nwr["healthcare"="clinic"](around:{radius_m},{latitude},{longitude});'
+        f'nwr["healthcare"="doctor"](around:{radius_m},{latitude},{longitude});'
+        f'nwr["healthcare"="doctors"](around:{radius_m},{latitude},{longitude});'
+        f'nwr["healthcare"="medical_centre"](around:{radius_m},{latitude},{longitude});'
+        f'nwr["healthcare"="medical_center"](around:{radius_m},{latitude},{longitude});'
         ");"
         "out center tags;"
     )
@@ -223,6 +227,7 @@ def parse_osm_element(
         return None
 
     source_type = element["type"]
+    facility_type = _facility_type_from_tags(tags)
     coordinates = _coordinates_for_element(element, source_type)
     distance_km = None
     if coordinates[0] is not None and coordinates[1] is not None:
@@ -235,6 +240,7 @@ def parse_osm_element(
     address_parts = osm_address_parts(tags)
     return ClinicListing(
         name=name,
+        facility_type=facility_type,
         address=address_parts["address"],
         locality=address_parts["locality"],
         district=address_parts["district"],
@@ -307,6 +313,19 @@ def _first_tag(tags: Mapping[str, Any], *keys: str) -> str | None:
         if value:
             return value
     return None
+
+
+def _facility_type_from_tags(tags: Mapping[str, Any]) -> str:
+    # The current schema has no separate doctor-practice type, so individual
+    # doctor practices are represented as clinics for now.
+    value = (_first_tag(tags, "healthcare", "amenity") or "").casefold()
+    return {
+        "clinic": "clinic",
+        "doctor": "clinic",
+        "doctors": "clinic",
+        "medical_centre": "clinic",
+        "medical_center": "clinic",
+    }.get(value, "clinic")
 
 
 def _services_from_tags(tags: Mapping[str, Any]) -> list[str]:

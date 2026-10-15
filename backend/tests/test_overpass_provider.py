@@ -93,6 +93,65 @@ def test_parses_node_and_normalizes_contact_fields() -> None:
     assert result.distance_km is not None and result.distance_km < 1
 
 
+@pytest.mark.parametrize(
+    "healthcare_value",
+    ["clinic", "doctor", "doctors", "medical_centre", "medical_center"],
+)
+def test_supported_healthcare_tags_normalize_to_unverified_clinics(
+    healthcare_value: str,
+) -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 114,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {
+                        "name": f"{healthcare_value} clinic",
+                        "healthcare": healthcare_value,
+                        "addr:street": "Park Street",
+                    },
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.facility_type == "clinic"
+    assert result.verification_status == "unverified"
+    assert result.source_type == "node"
+    assert result.source_id == 114
+    assert result.source_data["healthcare"] == healthcare_value
+    assert result.data_sources == ["OpenStreetMap"]
+
+
+def test_amenity_clinic_preserves_source_tag_and_identity() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 115,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {"name": "Amenity Clinic", "amenity": "clinic"},
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.facility_type == "clinic"
+    assert result.source_type == "node"
+    assert result.source_id == 115
+    assert result.source_data["amenity"] == "clinic"
+    assert result.verification_status == "unverified"
+
+
 def test_preserves_district_separately_from_city_and_locality() -> None:
     provider = make_provider(
         lambda request: response(
@@ -345,6 +404,35 @@ def test_duplicate_source_elements_are_deduplicated_without_name_merging() -> No
     ]
 
 
+def test_malformed_first_duplicate_does_not_discard_valid_occurrence() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 2,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {"amenity": "clinic"},
+                },
+                {
+                    "type": "node",
+                    "id": 2,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {"name": "Recovered Clinic", "healthcare": "doctor"},
+                },
+            ]
+        )
+    )
+
+    results = run(provider.search(search_params()))
+
+    assert len(results) == 1
+    assert results[0].name == "Recovered Clinic"
+    assert (results[0].source_type, results[0].source_id) == ("node", 2)
+
+
 def test_filters_provider_results_outside_requested_radius() -> None:
     provider = make_provider(
         lambda request: response(
@@ -391,6 +479,19 @@ def test_query_uses_validated_numeric_values_and_configured_timeout() -> None:
 
     assert "[timeout:7]" in query
     assert "around:5000.0,22.5726,88.3639" in query
+    for healthcare_value in (
+        "clinic",
+        "doctor",
+        "doctors",
+        "medical_centre",
+        "medical_center",
+    ):
+        assert f'nwr["healthcare"="{healthcare_value}"]' in query
+    assert 'nwr["amenity"="clinic"]' in query
+    assert '"healthcare"="hospital"' not in query
+    assert '"healthcare"="diagnostic_centre"' not in query
+    assert '"healthcare"="laboratory"' not in query
+    assert '"healthcare"="*"' not in query
     assert "https://" not in query
 
 
