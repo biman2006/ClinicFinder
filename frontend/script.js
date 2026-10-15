@@ -242,6 +242,10 @@ function formatValue(value) {
     return typeof value === "string" && value.trim() ? value : "Not available";
 }
 
+function hasText(value) {
+    return typeof value === "string" && value.trim().length > 0;
+}
+
 function formatDate(value) {
     if (!value) return null;
     const date = new Date(value);
@@ -249,12 +253,38 @@ function formatDate(value) {
 }
 
 function appendDetail(card, label, value, className = "") {
+    if (
+        value === null ||
+        value === undefined ||
+        (typeof value === "string" && !hasText(value))
+    ) {
+        return;
+    }
     const detail = document.createElement("p");
     detail.className = className;
     const strong = document.createElement("strong");
     strong.textContent = `${label}: `;
-    detail.append(strong, document.createTextNode(formatValue(value)));
+    detail.append(strong, document.createTextNode(
+        hasText(value) ? value.trim() : String(value)
+    ));
     card.appendChild(detail);
+}
+
+function addressStatusLabel(status) {
+    return {
+        complete: "Complete address",
+        incomplete: "Partial address",
+        unknown: "Address unavailable"
+    }[status] || "Address status unavailable";
+}
+
+function verificationStatusLabel(status) {
+    return {
+        verified: "Verified",
+        stale: "Stale — re-verification needed",
+        unverified: "Unverified listing",
+        pending: "Unverified listing"
+    }[status] || "Verification status unknown";
 }
 
 function createClinicCard(clinic) {
@@ -267,11 +297,7 @@ function createClinicCard(clinic) {
     name.textContent = formatValue(clinic.name);
     const badge = document.createElement("span");
     badge.className = "verification-badge";
-    badge.textContent = clinic.verification_status === "verified"
-        ? "Verified"
-        : clinic.verification_status === "stale"
-            ? "Stale — re-verification needed"
-            : "OSM listing — not verified";
+    badge.textContent = verificationStatusLabel(clinic.verification_status);
     header.append(name, badge);
     card.appendChild(header);
 
@@ -281,28 +307,35 @@ function createClinicCard(clinic) {
     addressTitle.textContent = "Address";
     address.appendChild(addressTitle);
     const addressText = document.createElement("p");
-    const addressStatus = clinic.address_status === "incomplete"
-        ? "Address incomplete — PIN code only"
-        : formatValue(clinic.address);
-    addressText.textContent = addressStatus;
+    addressText.className = "address-status";
+    addressText.textContent = addressStatusLabel(clinic.address_status);
     address.appendChild(addressText);
+    if (hasText(clinic.address)) {
+        const addressValue = document.createElement("p");
+        addressValue.textContent = clinic.address.trim();
+        address.appendChild(addressValue);
+    }
     appendDetail(address, "Locality", clinic.locality);
+    appendDetail(address, "District", clinic.district);
     appendDetail(address, "City", clinic.city);
     appendDetail(address, "PIN code", clinic.postal_code);
     card.appendChild(address);
     appendDetail(card, "Facility type", clinic.facility_type);
+    const checkedDate = formatDate(
+        clinic.last_verified_at || clinic.last_checked_at
+    );
     appendDetail(
         card,
         clinic.verification_status === "verified" ? "Last verified" : "Last checked",
-        formatDate(clinic.last_verified_at || clinic.last_checked_at)
+        checkedDate
     );
 
     const actions = document.createElement("div");
     actions.className = "clinic-actions";
-    if (clinic.phone) {
+    if (hasText(clinic.phone)) {
         const callLink = document.createElement("a");
         callLink.className = "button button-primary";
-        callLink.href = `tel:${clinic.phone}`;
+        callLink.href = `tel:${clinic.phone.trim()}`;
         callLink.textContent = "Call clinic";
         actions.appendChild(callLink);
     }
@@ -319,19 +352,17 @@ function createClinicCard(clinic) {
     card.appendChild(actions);
 
     appendDetail(card, "Phone", clinic.phone);
-    if (clinic.website) {
+    if (hasText(clinic.website)) {
         const website = document.createElement("p");
         website.className = "clinic-detail";
         website.append("Website: ");
         const websiteLink = document.createElement("a");
-        websiteLink.href = clinic.website;
+        websiteLink.href = clinic.website.trim();
         websiteLink.target = "_blank";
         websiteLink.rel = "noopener noreferrer";
-        websiteLink.textContent = clinic.website;
+        websiteLink.textContent = clinic.website.trim();
         website.appendChild(websiteLink);
         card.appendChild(website);
-    } else {
-        appendDetail(card, "Website", null);
     }
     appendDetail(
         card,
@@ -343,17 +374,34 @@ function createClinicCard(clinic) {
 
     const information = document.createElement("div");
     information.className = "clinic-information-grid";
-    appendDetail(information, "Doctors", clinic.doctors && clinic.doctors.length
-        ? clinic.doctors.join(", ")
-        : null);
-    appendDetail(information, "Consultation hours", null);
-    appendDetail(information, "Patient reviews and rating", clinic.rating === null || clinic.rating === undefined
-        ? null
-        : String(clinic.rating));
-    appendDetail(information, "Services", clinic.services && clinic.services.length
-        ? `${clinic.services.join(", ")} (provider data; not verified)`
-        : "Not available");
-    card.appendChild(information);
+    const doctors = Array.isArray(clinic.doctors)
+        ? clinic.doctors.filter(hasText)
+        : [];
+    const services = Array.isArray(clinic.services)
+        ? clinic.services.filter(hasText)
+        : [];
+    appendDetail(
+        information,
+        "Doctors",
+        doctors.length ? doctors.join(", ") : null
+    );
+    appendDetail(
+        information,
+        "Patient reviews and rating",
+        clinic.rating === null || clinic.rating === undefined
+            ? null
+            : String(clinic.rating)
+    );
+    appendDetail(
+        information,
+        "Services",
+        services.length
+            ? `${services.join(", ")} (provider data; not verified)`
+            : null
+    );
+    if (information.childElementCount > 0) {
+        card.appendChild(information);
+    }
 
     const source = document.createElement("p");
     source.className = "clinic-disclaimer";
