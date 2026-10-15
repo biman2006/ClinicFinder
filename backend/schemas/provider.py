@@ -20,6 +20,7 @@ class ClinicListing(BaseModel):
     facility_type: Literal["clinic", "diagnostic_centre", "hospital", "unknown"] = "clinic"
     address: str | None = None
     locality: str | None = None
+    district: str | None = None
     city: str | None = None
     postal_code: str | None = None
     address_status: Literal["complete", "incomplete", "unknown"] = "unknown"

@@ -73,6 +73,7 @@ class OverpassClinicProvider(ClinicDataProvider):
                 _http_failure_category(exc.response.status_code),
                 self.settings.overpass_endpoint,
                 status_code=exc.response.status_code,
+                response_content_type=exc.response.headers.get("content-type"),
                 query_length=len(query),
                 exception=exc,
             )
@@ -93,10 +94,27 @@ class OverpassClinicProvider(ClinicDataProvider):
         if not isinstance(payload, Mapping) or not isinstance(
             payload.get("elements"), list
         ):
+            _log_provider_failure(
+                "invalid_payload",
+                self.settings.overpass_endpoint,
+                query_length=len(query),
+                exception=ValueError("invalid provider payload"),
+            )
             raise ProviderResponseError("The clinic data provider returned an invalid payload.")
 
         results: list[ClinicListing] = []
         seen: set[tuple[str, int]] = set()
+        counts = {
+            "raw_elements": len(payload["elements"]),
+            "category_filtered": len(payload["elements"]),
+            "valid_identity": 0,
+            "parsed": 0,
+            "missing_name": 0,
+            "invalid_coordinates": 0,
+            "outside_radius": 0,
+            "duplicate_identity": 0,
+            "accepted": 0,
+        }
         for element in payload["elements"]:
             if not isinstance(element, Mapping):
                 continue
@@ -104,19 +122,37 @@ class OverpassClinicProvider(ClinicDataProvider):
             source_id = element.get("id")
             if source_type not in {"node", "way", "relation"} or not isinstance(source_id, int):
                 continue
+            counts["valid_identity"] += 1
             source_key = (source_type, source_id)
             if source_key in seen:
+                counts["duplicate_identity"] += 1
                 continue
             listing = parse_osm_element(
                 element,
                 origin_latitude=params.latitude,
                 origin_longitude=params.longitude,
             )
-            if listing is not None:
-                if listing.distance_km is None or listing.distance_km > params.radius_km:
-                    continue
-                seen.add(source_key)
-                results.append(listing)
+            if listing is None:
+                tags = element.get("tags")
+                if not isinstance(tags, Mapping) or not _tag_text(tags, "name"):
+                    counts["missing_name"] += 1
+                else:
+                    counts["invalid_coordinates"] += 1
+                continue
+            counts["parsed"] += 1
+            if listing.distance_km is None:
+                counts["invalid_coordinates"] += 1
+                continue
+            if listing.distance_km > params.radius_km:
+                counts["outside_radius"] += 1
+                continue
+            seen.add(source_key)
+            results.append(listing)
+            counts["accepted"] += 1
+        logger.info(
+            "Overpass clinic search candidate counts",
+            extra={"candidate_counts": counts},
+        )
         return results
 
 
@@ -125,6 +161,7 @@ def _log_provider_failure(
     endpoint: str,
     *,
     status_code: int | None = None,
+    response_content_type: str | None = None,
     query_length: int | None = None,
     exception: Exception,
 ) -> None:
@@ -135,6 +172,7 @@ def _log_provider_failure(
             "provider_failure_category": category,
             "provider_exception_type": type(exception).__name__,
             "provider_http_status": status_code,
+            "provider_response_content_type": response_content_type,
             "provider_query_length": query_length,
             "provider_endpoint": (
                 f"{parsed_endpoint.scheme}://{parsed_endpoint.netloc}"
@@ -199,6 +237,7 @@ def parse_osm_element(
         name=name,
         address=address_parts["address"],
         locality=address_parts["locality"],
+        district=address_parts["district"],
         city=address_parts["city"],
         postal_code=address_parts["postal_code"],
         address_status=address_status(address_parts),

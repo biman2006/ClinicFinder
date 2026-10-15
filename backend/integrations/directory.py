@@ -240,7 +240,14 @@ class ClinicDirectory:
 
     def search(self, params: ClinicSearchParams) -> list[ClinicListing]:
         results: list[ClinicListing] = []
+        counts = {
+            "records": 0,
+            "status_eligible": 0,
+            "outside_radius": 0,
+            "accepted": 0,
+        }
         for record in self.list():
+            counts["records"] += 1
             record = _with_current_status(record)
             osm_identity = extract_osm_identity(
                 record.source_type,
@@ -254,10 +261,12 @@ class ClinicDirectory:
                 and (record.verification_status != "verified" or record.status != "verified")
             ):
                 continue
+            counts["status_eligible"] += 1
             distance = _distance_km(
                 params.latitude, params.longitude, record.latitude, record.longitude
             )
             if distance > params.radius_km:
+                counts["outside_radius"] += 1
                 continue
             address_parts = osm_address_parts(record.source_data) if is_imported else {}
             address = address_parts.get("address") or record.address
@@ -269,6 +278,7 @@ class ClinicDirectory:
             ):
                 address = None
             locality = address_parts.get("locality") or record.locality
+            district = address_parts.get("district") or record.district
             city = address_parts.get("city") or record.city
             postal_code = address_parts.get("postal_code") or record.postal_code
             results.append(
@@ -278,6 +288,7 @@ class ClinicDirectory:
                     facility_type=record.facility_type,
                     address=address,
                     locality=locality,
+                    district=district,
                     city=city,
                     postal_code=postal_code,
                     address_status=(
@@ -308,6 +319,11 @@ class ClinicDirectory:
                     verification_status="unverified" if is_imported else "verified",
                 )
             )
+            counts["accepted"] += 1
+        logger.info(
+            "Directory clinic search candidate counts",
+            extra={"candidate_counts": counts},
+        )
         return results
 
     def upsert_imported(

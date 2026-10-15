@@ -14,6 +14,7 @@ class DirectoryBranchInput(BaseModel):
     facility_type: FacilityType
     address: str = Field(max_length=500)
     locality: str | None = Field(default=None, max_length=200)
+    district: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=120)
     postal_code: str | None = Field(default=None, max_length=20)
     latitude: float = Field(ge=-90, le=90)

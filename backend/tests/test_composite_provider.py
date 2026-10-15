@@ -80,6 +80,22 @@ def test_source_failure_does_not_hide_successful_source() -> None:
     assert [result.clinic_id for result in results] == ["branch-1"]
 
 
+def test_empty_overpass_success_is_not_marked_unavailable() -> None:
+    provider = CompositeClinicProvider(
+        [StubProvider([]), StubProvider([directory_listing()])]
+    )
+
+    results = asyncio.run(
+        provider.search(ClinicSearchParams(latitude=22.76, longitude=88.37, radius_km=1))
+    )
+
+    assert len(results) == 1
+    assert provider.last_source_status == {
+        "stubprovider_1": "ok",
+        "stubprovider_2": "ok",
+    }
+
+
 def test_directory_failure_does_not_hide_successful_osm_source() -> None:
     provider = CompositeClinicProvider(
         [

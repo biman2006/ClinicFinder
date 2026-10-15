@@ -294,6 +294,7 @@ def feature_to_directory_input(feature: Mapping[str, Any]) -> DirectoryBranchInp
     address_parts = osm_address_parts(tags)
     address = address_parts["address"] or ""
     locality = address_parts["locality"]
+    district = address_parts["district"]
     city = address_parts["city"]
     postal_code = address_parts["postal_code"]
     source_id_text = f"osm:{source_type}/{source_id}"
@@ -306,6 +307,7 @@ def feature_to_directory_input(feature: Mapping[str, Any]) -> DirectoryBranchInp
     field_values = {
         "address": address,
         "locality": locality,
+        "district": district,
         "city": city,
         "postal_code": postal_code,
         "phone": _first_tag(tags, "phone", "contact:phone"),
@@ -320,6 +322,7 @@ def feature_to_directory_input(feature: Mapping[str, Any]) -> DirectoryBranchInp
         facility_type=category,
         address=address,
         locality=locality,
+        district=district,
         city=city,
         postal_code=postal_code,
         latitude=latitude,

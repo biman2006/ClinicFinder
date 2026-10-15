@@ -113,6 +113,44 @@ def test_legacy_imported_record_recovers_osm_identity_and_fields(
     assert results[0].address_status == "complete"
 
 
+def test_imported_directory_response_exposes_district_separately(
+    tmp_path: Path,
+) -> None:
+    directory = ClinicDirectory(tmp_path / "directory.sqlite3")
+    directory.upsert_imported(
+        DirectoryBranchInput(
+            facility_name="Repose Clinic and Research Centre",
+            branch_name="Repose Clinic and Research Centre",
+            facility_type="clinic",
+            address="20/C, Broad Street,(Ballygunge)",
+            postal_code="700019",
+            latitude=22.76,
+            longitude=88.37,
+            district="Kolkata",
+            source_type="node",
+            source_id=909,
+            source_data={
+                "name": "Repose Clinic and Research Centre",
+                "addr:district": "Kolkata",
+                "addr:full": "20/C, Broad Street,(Ballygunge)",
+                "addr:postcode": "700019",
+            },
+        )
+    )
+
+    results = asyncio.run(
+        DirectoryClinicProvider(directory).search(
+            ClinicSearchParams(latitude=22.76, longitude=88.37, radius_km=1)
+        )
+    )
+
+    assert len(results) == 1
+    assert results[0].district == "Kolkata"
+    assert results[0].locality is None
+    assert results[0].city is None
+    assert results[0].address == "20/C, Broad Street,(Ballygunge)"
+
+
 def test_stale_verified_branch_is_not_publicly_searchable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

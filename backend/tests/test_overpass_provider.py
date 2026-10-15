@@ -77,6 +77,89 @@ def test_parses_node_and_normalizes_contact_fields() -> None:
     assert result.distance_km is not None and result.distance_km < 1
 
 
+def test_preserves_district_separately_from_city_and_locality() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 111,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {
+                        "name": "Repose Clinic and Research Centre",
+                        "addr:district": "Kolkata",
+                        "addr:full": "20/C, Broad Street,(Ballygunge)",
+                        "addr:postcode": "700019",
+                    },
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.address == "20/C, Broad Street,(Ballygunge)"
+    assert result.district == "Kolkata"
+    assert result.locality is None
+    assert result.city is None
+    assert result.postal_code == "700019"
+
+
+def test_preserves_explicit_locality_without_inference() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 112,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {
+                        "name": "Locality Clinic",
+                        "addr:suburb": "Ballygunge",
+                        "addr:district": "Kolkata",
+                    },
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.locality == "Ballygunge"
+    assert result.district == "Kolkata"
+    assert result.city is None
+
+
+def test_records_without_address_administrative_tags_remain_null() -> None:
+    provider = make_provider(
+        lambda request: response(
+            [
+                {
+                    "type": "node",
+                    "id": 113,
+                    "lat": 22.57,
+                    "lon": 88.36,
+                    "tags": {
+                        "name": "Unclassified Address Clinic",
+                        "addr:street": "Hazra Road",
+                        "addr:housenumber": "52/2B",
+                        "addr:postcode": "700019",
+                    },
+                }
+            ]
+        )
+    )
+
+    result = run(provider.search(search_params()))[0]
+
+    assert result.address == "52/2B, Hazra Road"
+    assert result.locality is None
+    assert result.district is None
+    assert result.city is None
+
+
 def test_parses_way_using_center_coordinates() -> None:
     provider = make_provider(
         lambda request: response(
@@ -221,6 +304,7 @@ def test_http_failures_log_safe_status_category(
     record = next(record for record in caplog.records if record.message == "Overpass provider request failed")
     assert record.provider_failure_category == category
     assert record.provider_http_status == status_code
+    assert record.provider_response_content_type is None
     assert record.provider_exception_type == "HTTPStatusError"
     assert record.provider_query_length > 0
 

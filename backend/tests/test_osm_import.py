@@ -10,7 +10,14 @@ import pytest
 from backend.integrations.directory import ClinicDirectory, DirectoryClinicProvider
 from backend.schemas.directory import DirectoryBranchInput
 from backend.schemas.provider import ClinicSearchParams
-from backend.scripts.import_osm import Boundary, _PbfHandler, import_features, import_pbf
+from backend.scripts.import_osm import (
+    Boundary,
+    _PbfHandler,
+    category_for_tags,
+    feature_to_directory_input,
+    import_features,
+    import_pbf,
+)
 
 
 def feature(
@@ -90,6 +97,27 @@ def test_import_is_idempotent_and_keeps_source_identity(tmp_path: Path) -> None:
     assert record.source_type == "node"
     assert record.source_id == 10
     assert record.source_data["healthcare"] == "clinic"
+
+
+def test_import_normalization_preserves_district_without_mapping_to_city() -> None:
+    data = feature_to_directory_input(
+        {
+            **feature(),
+            "tags": {
+                "name": "Repose Clinic and Research Centre",
+                "healthcare": "clinic",
+                "addr:district": "Kolkata",
+                "addr:full": "20/C, Broad Street,(Ballygunge)",
+                "addr:postcode": "700019",
+            },
+        }
+    )
+
+    assert data.address == "20/C, Broad Street,(Ballygunge)"
+    assert data.district == "Kolkata"
+    assert data.locality is None
+    assert data.city is None
+    assert data.postal_code == "700019"
 
 
 def test_verified_record_is_not_downgraded_by_reimport(tmp_path: Path) -> None:
@@ -183,6 +211,20 @@ def test_import_boundary_invalid_geometry_categories_and_dry_run(tmp_path: Path)
     assert report.outside_boundary == 1
     assert report.category_counts == {"clinic": 1, "diagnostic_centre": 1, "hospital": 1}
     assert directory.list(include_deactivated=True) == []
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        {"healthcare": "doctor"},
+        {"healthcare": "doctors"},
+        {"amenity": "doctors"},
+    ],
+)
+def test_doctor_tags_are_intentionally_imported_as_clinics(
+    tags: dict[str, str],
+) -> None:
+    assert category_for_tags(tags) == "clinic"
 
 
 @pytest.mark.parametrize(

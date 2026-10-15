@@ -292,13 +292,14 @@ flowchart TD
 Do not log sensitive symptom text unnecessarily. Provider failures must
 never cause fabricated clinic data.
 
-## 9. Intended repository structure
+## 9. Repository structure
 
-This is a target structure. Add modules only when the corresponding
-implementation phase begins.
+The repository root contains the application source, frontend, documentation,
+and supporting data. Add modules only when the corresponding implementation
+phase begins.
 
 ``` text
-clinic_platform_blueprint/
+repository-root/
 ├── .github/
 │   └── copilot-instructions.md
 ├── backend/

@@ -63,6 +63,7 @@ def osm_address_parts(tags: Mapping[str, Any]) -> dict[str, str | None]:
         "housenumber": _tag_text(tags, "addr:housenumber"),
         "street": _tag_text(tags, "addr:street"),
         "locality": _first_tag(tags, "addr:suburb", "addr:locality", "addr:neighbourhood"),
+        "district": _tag_text(tags, "addr:district"),
         "city": _first_tag(tags, "addr:city", "addr:town", "addr:municipality"),
         "postal_code": _first_tag(tags, "addr:postcode", "addr:postalcode"),
     }
